@@ -2269,9 +2269,15 @@ static int cpufreq_set_policy(struct cpufreq_policy *policy,
 	blocking_notifier_call_chain(&cpufreq_policy_notifier_list,
 			CPUFREQ_ADJUST, new_policy);
 
+#ifndef CONFIG_BOARD_XIAOMI
 	/* adjust if necessary - hardware incompatibility */
 	blocking_notifier_call_chain(&cpufreq_policy_notifier_list,
+			CPUFREQ_INCOMPATIBLE, new_policy);
+#else
+	/* the adjusted frequency should not exceed thermal limit*/
+	blocking_notifier_call_chain(&cpufreq_policy_notifier_list,
 			CPUFREQ_THERMAL, new_policy);
+#endif
 
 	/*
 	 * verify the cpu speed can be set within this limit, which might be
