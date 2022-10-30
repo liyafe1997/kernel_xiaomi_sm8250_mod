@@ -72,6 +72,22 @@ enum core_ldo_levels {
 #define DP_MODE			BIT(1) /* enables DP mode */
 #define USB3_DP_COMBO_MODE	(USB3_MODE | DP_MODE) /*enables combo mode */
 
+#define USB3_DP_QSERDES_TXA_TX_DRV_LVL		(0x1214)
+#define USB3_DP_PCS_G12S1_TXMGN_V0		(0x1D38)
+#define USB3_DP_PCS_G12S1_TXDEEMPH_M3P5DB 	(0x1D6C)
+
+unsigned int ssphy_txa_tx_drv_lvl;
+module_param(ssphy_txa_tx_drv_lvl, uint, 0644);
+MODULE_PARM_DESC(ssphy_txa_tx_drv_lvl, "USB3_DP_QSERDES_TXA_TX_DRV_LVL");
+
+unsigned int ssphy_pcs_g12s1_txmgn_v0;
+module_param(ssphy_pcs_g12s1_txmgn_v0, uint, 0644);
+MODULE_PARM_DESC(ssphy_pcs_g12s1_txmgn_v0, "USB3_DP_PCS_G12S1_TXMGN_V0");
+
+unsigned int ssphy_pcs_g12s1_txdeemph_m3p5db;
+module_param(ssphy_pcs_g12s1_txdeemph_m3p5db, uint, 0644);
+MODULE_PARM_DESC(ssphy_pcs_g12s1_txdeemph_m3p5db, "USB3_DP_PCS_G12S1_TXDEEMPH_M3P5DB");
+
 enum qmp_phy_rev_reg {
 	USB3_PHY_PCS_STATUS,
 	USB3_PHY_AUTONOMOUS_MODE_CTRL,
@@ -449,6 +465,42 @@ static void usb_qmp_powerup_phy(struct msm_ssphy_qmp *phy)
 	mb();
 }
 
+static void msm_ssphy_xiaomi_update_write(struct usb_phy *uphy)
+{
+	struct msm_ssphy_qmp *phy = container_of(uphy, struct msm_ssphy_qmp,
+					phy);
+
+	if (ssphy_txa_tx_drv_lvl)
+		writel_relaxed(ssphy_txa_tx_drv_lvl,
+			phy->base + USB3_DP_QSERDES_TXA_TX_DRV_LVL);
+
+	if (ssphy_pcs_g12s1_txmgn_v0)
+		writel_relaxed(ssphy_pcs_g12s1_txmgn_v0,
+			phy->base + USB3_DP_PCS_G12S1_TXMGN_V0);
+
+	if (ssphy_pcs_g12s1_txdeemph_m3p5db)
+		writel_relaxed(ssphy_pcs_g12s1_txdeemph_m3p5db,
+			phy->base + USB3_DP_PCS_G12S1_TXDEEMPH_M3P5DB);
+}
+
+static void msm_ssphy_xiaomi_update_read(struct usb_phy *uphy)
+{
+	struct msm_ssphy_qmp *phy = container_of(uphy, struct msm_ssphy_qmp,
+					phy);
+
+	pr_err("%s: USB3_DP: QSERDES_TXA_TX_DRV_LVL: (0x%02x)\n",
+		__func__,
+		readb_relaxed(phy->base + USB3_DP_QSERDES_TXA_TX_DRV_LVL));
+
+	pr_err("%s: USB3_DP: PCS_G12S1_TXMGN_V0: (0x%02x)\n",
+		__func__,
+		readb_relaxed(phy->base + USB3_DP_PCS_G12S1_TXMGN_V0));
+
+	pr_err("%s: USB3_DP: PCS_G12S1_TXDEEMPH_M3P5DB: (0x%02x)\n",
+		__func__,
+		readb_relaxed(phy->base + USB3_DP_PCS_G12S1_TXDEEMPH_M3P5DB));
+}
+
 /* SSPHY Initialization */
 static int msm_ssphy_qmp_init(struct usb_phy *uphy)
 {
@@ -484,6 +536,10 @@ static int msm_ssphy_qmp_init(struct usb_phy *uphy)
 		dev_err(uphy->dev, "Failed the main PHY configuration\n");
 		goto fail;
 	}
+
+	/* Update the xiaomi modified PHY QMP registers */
+	msm_ssphy_xiaomi_update_write(uphy);
+	msm_ssphy_xiaomi_update_read(uphy);
 
 	/* perform software reset of PHY common logic */
 	if (phy->phy.type == USB_PHY_TYPE_USB3_AND_DP &&
