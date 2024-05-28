@@ -519,9 +519,12 @@ static inline bool dwc3_msm_is_superspeed(struct dwc3_msm *mdwc)
 	if (mdwc->in_host_mode) {
 		ret = dwc3_msm_is_host_superspeed(mdwc);
 		dev_info(mdwc->dev, "%s: host SS:%d.\n", __func__,ret);
-	} else {
+	} else if (mdwc->in_device_mode) {
 		ret =  dwc3_msm_is_dev_superspeed(mdwc);
 		dev_info(mdwc->dev, "%s: device SS:%d.\n", __func__, ret);
+	} else {
+		dev_info(mdwc->dev, "%s: Null Insert.\n", __func__);
+		return 0;
 	}
 
 	return ret;
