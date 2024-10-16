@@ -178,6 +178,11 @@ struct drm_panel_esd_config {
 	u32 groups;
 };
 
+struct brightness_alpha_pair {
+	u32 brightness;
+	u32 alpha;
+};
+
 struct dsi_panel {
 	const char *name;
 	const char *type;
@@ -233,6 +238,9 @@ struct dsi_panel {
 	int panel_test_gpio;
 	int power_mode;
 	enum dsi_panel_physical_type panel_type;
+
+	struct brightness_alpha_pair *fod_dim_lut;
+	u32 fod_dim_lut_count;
 };
 
 static inline bool dsi_panel_ulps_feature_enabled(struct dsi_panel *panel)
@@ -368,5 +376,9 @@ int dsi_panel_create_cmd_packets(const char *data,
 				struct dsi_cmd_desc *cmd);
 void dsi_panel_destroy_cmd_packets(struct dsi_panel_cmd_set *set);
 void dsi_panel_dealloc_cmd_packets(struct dsi_panel_cmd_set *set);
+
+int dsi_panel_set_fod_hbm(struct dsi_panel *panel, bool status);
+
+u32 dsi_panel_get_fod_dim_alpha(struct dsi_panel *panel);
 
 #endif /* _DSI_PANEL_H_ */

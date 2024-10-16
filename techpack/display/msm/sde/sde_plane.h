@@ -314,4 +314,6 @@ bool sde_plane_is_cache_required(struct drm_plane *plane);
  */
 uint32_t sde_plane_get_mi_layer_info(const struct drm_plane_state *drm_state);
 
+int sde_plane_is_fod_layer(const struct drm_plane_state *drm_state);
+
 #endif /* _SDE_PLANE_H_ */

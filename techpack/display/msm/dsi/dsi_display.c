@@ -51,6 +51,8 @@ static const struct of_device_id dsi_display_dt_match[] = {
 	{}
 };
 
+struct dsi_display *primary_display;
+
 static void dsi_display_mask_ctrl_error_interrupts(struct dsi_display *display,
 			u32 mask, bool enable)
 {
@@ -5423,6 +5425,13 @@ static int dsi_display_sysfs_deinit(struct dsi_display *display)
 
 }
 
+void dsi_display_set_fod_ui(struct dsi_display *display, bool status)
+{
+	struct device *dev = &display->pdev->dev;
+	atomic_set(&display->fod_ui, status);
+	sysfs_notify(&dev->kobj, NULL, "fod_ui");
+}
+
 /**
  * dsi_display_bind - bind dsi device with controlling device
  * @dev:        Pointer to base of platform device
@@ -6864,6 +6873,7 @@ int dsi_display_get_modes(struct dsi_display *display,
 exit:
 	*out_modes = display->modes;
 	rc = 0;
+	primary_display = display;
 
 error:
 	if (rc)
@@ -7752,6 +7762,10 @@ error:
 	mutex_unlock(&display->display_lock);
 	SDE_EVT32(SDE_EVTLOG_FUNC_EXIT);
 	return rc;
+}
+
+struct dsi_display *get_main_display(void) {
+	return primary_display;
 }
 
 static int dsi_display_calc_ctrl_roi(const struct dsi_display *display,

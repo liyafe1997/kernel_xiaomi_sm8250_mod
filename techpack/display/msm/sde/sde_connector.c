@@ -785,6 +785,51 @@ static int _sde_connector_update_dirty_properties(
 	return 0;
 }
 
+
+void sde_connector_update_fod_hbm(struct drm_connector *connector)
+{
+	static atomic_t effective_status = ATOMIC_INIT(false);
+	struct sde_crtc_state *cstate;
+	struct sde_connector *c_conn;
+	struct dsi_display *display;
+	bool status;
+	struct dsi_panel_mi_cfg *mi_cfg;
+
+	if (!connector) {
+		SDE_ERROR("invalid connector\n");
+		return;
+	}
+
+	c_conn = to_sde_connector(connector);
+	if (c_conn->connector_type != DRM_MODE_CONNECTOR_DSI)
+		return;
+
+	display = (struct dsi_display *) c_conn->display;
+
+	if (!c_conn->encoder || !c_conn->encoder->crtc ||
+			!c_conn->encoder->crtc->state)
+		return;
+
+	cstate = to_sde_crtc_state(c_conn->encoder->crtc->state);
+	status = cstate->fod_dim_layer != NULL;
+	if (atomic_xchg(&effective_status, status) == status)
+		return;
+
+	mi_cfg = &display->panel->mi_cfg;
+
+	if ((status && mi_cfg && mi_cfg->delay_before_fod_hbm_on) ||
+			(!status && mi_cfg && mi_cfg->delay_before_fod_hbm_off))
+		sde_encoder_wait_for_event(c_conn->encoder, MSM_ENC_VBLANK);
+
+	dsi_panel_set_fod_hbm(display->panel, status);
+
+	if ((status && mi_cfg && mi_cfg->delay_after_fod_hbm_on) ||
+			(!status && mi_cfg && mi_cfg->delay_after_fod_hbm_off))
+		sde_encoder_wait_for_event(c_conn->encoder, MSM_ENC_VBLANK);
+
+	dsi_display_set_fod_ui(display, status);
+}
+
 struct sde_connector_dyn_hdr_metadata *sde_connector_get_dyn_hdr_meta(
 		struct drm_connector *connector)
 {
@@ -1191,6 +1236,8 @@ int sde_connector_pre_kickoff(struct drm_connector *connector)
 
 	/* fingerprint hbm fence */
 	_sde_connector_mi_dimlayer_hbm_fence(connector);
+
+	sde_connector_update_fod_hbm(connector);
 
 	rc = c_conn->ops.pre_kickoff(connector, c_conn->display, &params);
 

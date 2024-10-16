@@ -482,6 +482,7 @@ struct sde_crtc_state {
 	uint64_t input_fence_timeout_ns;
 	uint32_t num_dim_layers;
 	struct sde_hw_dim_layer dim_layer[SDE_MAX_DIM_LAYERS];
+	struct sde_hw_dim_layer *fod_dim_layer;
 	uint32_t num_ds;
 	uint32_t num_ds_enabled;
 	bool ds_dirty;

@@ -110,6 +110,7 @@ enum msm_mdp_plane_property {
 
 	/* range properties */
 	PLANE_PROP_ZPOS = PLANE_PROP_BLOBCOUNT,
+	PLANE_PROP_FOD,
 	PLANE_PROP_ALPHA,
 	PLANE_PROP_COLOR_FILL,
 	PLANE_PROP_H_DECIMATE,
