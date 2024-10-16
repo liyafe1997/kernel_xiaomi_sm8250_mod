@@ -275,6 +275,7 @@ struct dsi_display {
 	u32 clk_gating_config;
 	bool queue_cmd_waits;
 	struct workqueue_struct *dma_cmd_workq;
+	atomic_t fod_ui;
 };
 
 int dsi_display_dev_probe(struct platform_device *pdev);
