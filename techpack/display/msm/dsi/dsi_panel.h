@@ -178,6 +178,7 @@ struct drm_panel_esd_config {
 	u32 groups;
 };
 
+#define BRIGHTNESS_ALPHA_PAIR_LEN 2
 struct brightness_alpha_pair {
 	u32 brightness;
 	u32 alpha;
