@@ -90,7 +90,6 @@ obj-$(CONFIG_MACH_XIAOMI_CAS)	+= qcom_cas/
 obj-$(CONFIG_MACH_XIAOMI_PIPA)         += maxim_pipa/
 obj-y	+= lionsemi/
 obj-y	+= maxim/
-obj-y	+= maxim_pipa/
 obj-y	+= nuvolta/
 obj-y	+= renesas/
 obj-y	+= ti/
