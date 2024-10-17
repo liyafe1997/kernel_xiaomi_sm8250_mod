@@ -134,4 +134,11 @@ config USB_DWC3_MSM
 	  Driver supports host, device and dual-role modes of operation.
 	  Say 'Y' or 'M' if you have one such device.
 
+config NO_PS_USB3
+	tristate "Disable PS5169"
+	depends on I2C
+	help
+	  Say Y to remove PS5169 for USB3.2.
+	  PS5169 is a enhanced signal driver.
+
 endif
