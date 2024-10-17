@@ -42,6 +42,7 @@
 #include "sde_core_perf.h"
 #include "sde_trace.h"
 #include "xiaomi_frame_stat.h"
+#include "dsi_display.h"
 
 #define SDE_PSTATES_MAX (SDE_STAGE_MAX * 4)
 #define SDE_MULTIRECT_PLANE_MAX (SDE_STAGE_MAX * 2)
@@ -1477,6 +1478,10 @@ static void _sde_crtc_blend_setup_mixer(struct drm_crtc *crtc,
 		for (i = 0; i < cstate->num_dim_layers; i++)
 			_sde_crtc_setup_dim_layer_cfg(crtc, sde_crtc,
 					mixer, &cstate->dim_layer[i]);
+
+		if (cstate->fod_dim_layer)
+			_sde_crtc_setup_dim_layer_cfg(crtc, sde_crtc,
+					mixer, cstate->fod_dim_layer);
 	}
 
 	_sde_crtc_program_lm_output_roi(crtc);
@@ -4518,7 +4523,6 @@ sec_err:
 		smmu_state->secure_level, fb_ns, fb_sec_dir);
 	return -EINVAL;
 }
-
 
 static struct sde_hw_dim_layer* sde_crtc_setup_fod_dim_layer(
 		struct sde_crtc_state *cstate,
