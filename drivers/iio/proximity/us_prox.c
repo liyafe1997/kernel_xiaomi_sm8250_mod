@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 XiaoMi, Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -29,21 +29,22 @@
 #include <linux/regulator/driver.h>
 #include <linux/regulator/consumer.h>
 #include <linux/of_irq.h>
+#include <asm/bootinfo.h>
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
 
-#define US_PROX_IIO_NAME "distance"
+#define US_PROX_IIO_NAME		"distance"
 
 static struct us_prox_data *g_us_prox;
 
 struct us_prox_data {
-	struct platform_device *pdev;
+	struct platform_device	*pdev;
 	/* common state */
-	struct mutex mutex;
+	struct mutex		mutex;
 	/* for proximity sensor */
-	struct iio_dev *prox_idev;
-	bool prox_enabled;
-	int raw_data;
+	struct iio_dev		*prox_idev;
+	bool			prox_enabled;
+	int				raw_data;
 };
 
 struct us_prox_el_data {
@@ -52,26 +53,28 @@ struct us_prox_el_data {
 	int64_t timestamp;
 };
 
-#define US_SENSORS_CHANNELS(device_type, mask, index, mod, ch2, s, endian,     \
-			    rbits, sbits, addr)                                \
-	{                                                                      \
-		.type = device_type, .modified = mod,                          \
-		.info_mask_separate = mask, .scan_index = index,               \
-		.channel2 = ch2, .address = addr,                              \
-		.scan_type = {                                                 \
-			.sign = s,                                             \
-			.realbits = rbits,                                     \
-			.shift = sbits - rbits,                                \
-			.storagebits = sbits,                                  \
-			.endianness = endian,                                  \
-		},                                                             \
-	}
+#define US_SENSORS_CHANNELS(device_type, mask, index, mod, \
+					ch2, s, endian, rbits, sbits, addr) \
+{ \
+	.type = device_type, \
+	.modified = mod, \
+	.info_mask_separate = mask, \
+	.scan_index = index, \
+	.channel2 = ch2, \
+	.address = addr, \
+	.scan_type = { \
+		.sign = s, \
+		.realbits = rbits, \
+		.shift = sbits - rbits, \
+		.storagebits = sbits, \
+		.endianness = endian, \
+	}, \
+}
 
 static const struct iio_chan_spec us_proximity_channels[] = {
 	US_SENSORS_CHANNELS(IIO_PROXIMITY,
-			    BIT(IIO_CHAN_INFO_RAW) |
-				    BIT(IIO_CHAN_INFO_SAMP_FREQ),
-			    0, 0, IIO_NO_MOD, 'u', IIO_LE, 16, 16, 0),
+		BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SAMP_FREQ),
+		0, 0, IIO_NO_MOD, 'u', IIO_LE, 16, 16, 0),
 	IIO_CHAN_SOFT_TIMESTAMP(2)
 };
 
@@ -137,19 +140,18 @@ int us_afe_callback(int data)
 
 	if (g_us_prox) {
 		ret = iio_push_to_buffers(g_us_prox->prox_idev,
-					  (unsigned char *)&el_data);
+					 (unsigned char *)&el_data);
 		if (ret < 0)
 			pr_err("%s: failed to push us prox data to buffer, err=%d\n",
-			       __func__, ret);
+				__func__, ret);
 	}
 
 	return 0;
 }
-
 EXPORT_SYMBOL(us_afe_callback);
 
-static ssize_t us_show_dump_output(struct device *dev,
-				   struct device_attribute *attr, char *buf)
+static ssize_t dump_output_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
 {
 	struct us_prox_data *data;
 	unsigned long value;
@@ -163,15 +165,14 @@ static ssize_t us_show_dump_output(struct device *dev,
 	return scnprintf(buf, PAGE_SIZE, "%lu\n", value);
 }
 
-static ssize_t us_store_dump_output(struct device *dev,
-				    struct device_attribute *attr,
-				    const char *buf, size_t size)
+static ssize_t dump_output_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
 {
 	return 0;
 }
 
-static DEVICE_ATTR(dump_output, S_IWUSR | S_IRUGO, us_show_dump_output,
-		   us_store_dump_output);
+static DEVICE_ATTR_RW(dump_output);
+
 
 static struct attribute *us_prox_attributes[] = {
 	&dev_attr_dump_output.attr,
@@ -212,7 +213,7 @@ static int us_proximity_iio_setup(struct us_prox_data *data)
 	*priv_data = data;
 
 	ret = iio_triggered_buffer_setup(idev, NULL, NULL,
-					 &us_buffer_setup_ops);
+					&us_buffer_setup_ops);
 	if (ret < 0)
 		goto free_iio_p;
 
@@ -292,8 +293,10 @@ static int us_prox_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static const struct of_device_id dt_match[] = { { .compatible = "us_prox" },
-						{} };
+static const struct of_device_id dt_match[] = {
+	{ .compatible = "us_prox" },
+	{}
+};
 
 static struct platform_driver us_prox_driver = {
 	.probe		= us_prox_probe,
