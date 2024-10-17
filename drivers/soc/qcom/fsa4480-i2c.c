@@ -158,6 +158,12 @@ static int fsa4480_usbc_analog_setup_switches(struct fsa4480_priv *fsa_priv)
 	dev_info(dev, "%s: setting GPIOs active = %d, mode.intval = %d\n",
 		__func__, mode.intval != POWER_SUPPLY_TYPEC_NONE, mode.intval);
 
+	if ((atomic_read(&(fsa_priv->usbc_mode)) != mode.intval) &&
+		(mode.intval == POWER_SUPPLY_TYPEC_SINK_AUDIO_ADAPTER ||
+		mode.intval == POWER_SUPPLY_TYPEC_NONE)) {
+		atomic_set(&(fsa_priv->usbc_mode), mode.intval);
+	}
+
 	switch (mode.intval) {
 	/* add all modes FSA should notify for in here */
 	case POWER_SUPPLY_TYPEC_SINK_AUDIO_ADAPTER:
