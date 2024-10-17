@@ -264,6 +264,7 @@ scripts/config --file out/.config \
     -e PERF_HELPER \
     -e BOOTUP_RECLAIM \
     -e MI_RECLAIM \
+    -e RTMM \
 
 make $MAKE_ARGS -j$(nproc)
 
