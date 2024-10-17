@@ -156,6 +156,8 @@ static void ps5169_set_config(struct ps5169_info *info)
 
 	ret |= ps5169_update_reg(info, 0xA0, 0x02);		
 
+	ret |= ps5169_update_reg(info, 0x8d, 0x01);		
+	ret |= ps5169_update_reg(info, 0x90, 0x01);		
 
 	ret |= ps5169_update_reg(info, 0x51, 0x87);
 
@@ -165,7 +167,7 @@ static void ps5169_set_config(struct ps5169_info *info)
 
 	ret |= ps5169_update_reg(info, 0x5d, 0x66);
 
-	ret |= ps5169_update_reg(info, 0x52, 0x50);		
+	ret |= ps5169_update_reg(info, 0x52, 0x50);	
 
 	ret |= ps5169_update_reg(info, 0x55, 0x00);
 
@@ -253,9 +255,9 @@ void ps5169_cfg_usb(void)
 
 	pr_info("%s: start.\n", __func__);
 	if (g_info->flip == 1)
-		ret |= ps5169_update_reg(g_info, 0x40, 0xc0);  
+		ret |= ps5169_update_reg(g_info, 0x40, 0xc0);     
 	else if (g_info->flip == 2)
-		ret |= ps5169_update_reg(g_info, 0x40, 0xd0);    
+		ret |= ps5169_update_reg(g_info, 0x40, 0xd0);     
 	if (ret < 0)
 		pr_err("%s: crc err.\n", __func__);
 
@@ -280,13 +282,12 @@ static void ps5169_config_dp_only_mode(struct ps5169_info *info, int flip)
 
 	pr_info("%s: flip:%d.\n", __func__, flip);
 	if (flip == 1)
-		ret |= ps5169_update_reg(info, 0x40, 0xa0);		
+		ret |= ps5169_update_reg(info, 0x40, 0xa0);	
 	else if (flip == 2)
-		ret |= ps5169_update_reg(info, 0x40, 0xb0);		
+		ret |= ps5169_update_reg(info, 0x40, 0xb0);	
 
 	ret |= ps5169_update_reg(info, 0xa0, 0x00);		
 	ret |= ps5169_update_reg(info, 0xa1, 0x04);		
-	if (ret < 0)
 		pr_err("%s: crc err.\n", __func__);
 
 	ps5169_get_chipcfg_and_modeselection(info);
@@ -302,7 +303,6 @@ static void ps5169_config_usb_dp_mode(struct ps5169_info *info, int flip)
 	pr_info("%s: flip:%d.\n", __func__, flip);
 	if (flip == 1)
 		ret |= ps5169_update_reg(info, 0x40, 0xe0);		
-	else if (flip == 2)
 		ret |= ps5169_update_reg(info, 0x40, 0xf0);		
 
 	ret |= ps5169_update_reg(info, 0xa0, 0x00);		
@@ -339,7 +339,7 @@ static void ps5169_remove_dp(struct ps5169_info *info)
 
 	ret |= ps5169_update_reg(info, 0x40, 0x80);		
 	ret |= ps5169_update_reg(info, 0xa0, 0x02);		
-	ret |= ps5169_update_reg(info, 0xa1, 0x00);	
+	ret |= ps5169_update_reg(info, 0xa1, 0x00);		
 	if (ret < 0)
 		pr_err("%s: crc err.\n", __func__);
 }

@@ -46,8 +46,9 @@
 #include "dbm.h"
 #include "debug.h"
 #include "xhci.h"
-
+#if defined(CONFIG_MACH_XIAOMI_DAGU) || !defined(CONFIG_NO_PS_USB3)
 #include "../pd/ps5169.h"
+#endif
 
 static bool bc12_compliance;
 module_param(bc12_compliance, bool, 0644);
@@ -515,7 +516,6 @@ static inline bool dwc3_msm_is_superspeed(struct dwc3_msm *mdwc)
 		pr_err("the data is null \n");
 		return 0;
 	}
-
 	if (mdwc->in_host_mode) {
 		ret = dwc3_msm_is_host_superspeed(mdwc);
 		dev_info(mdwc->dev, "%s: host SS:%d.\n", __func__,ret);
@@ -3632,20 +3632,21 @@ static ssize_t speed_store(struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR_RW(speed);
 
-static ssize_t super_speed_show(struct device *dev, struct device_attribute *attr,
+static ssize_t super_speed_show(struct device *dev,
+				struct device_attribute *attr,
 				char *buf)
 {
-	int ret=0;
+	int ret = 0;
 	struct dwc3_msm *mdwc = dev_get_drvdata(dev);
 
 	ret = dwc3_msm_is_superspeed(mdwc);
-	pr_err("super speed value: %d \n",ret);
-	return snprintf(buf, PAGE_SIZE, "%s\n",
-			ret ? "true" : "false");
+	pr_err("super speed value: %d \n", ret);
+	return snprintf(buf, PAGE_SIZE, "%s\n", ret ? "true" : "false");
 }
 
-static ssize_t super_speed_store(struct device *dev, struct device_attribute *attr,
-		const char *buf, size_t count)
+static ssize_t super_speed_store(struct device *dev,
+				 struct device_attribute *attr,
+				 const char *buf, size_t count)
 {
 	return 0;
 }
@@ -3759,12 +3760,41 @@ static int dwc_dpdm_cb(struct notifier_block *nb, unsigned long evt, void *p)
 	return NOTIFY_OK;
 }
 
+static ssize_t usb_data_enabled_show(struct device *dev,
+				     struct device_attribute *attr, char *buf)
+{
+	struct dwc3_msm *mdwc = dev_get_drvdata(dev);
+
+	return sysfs_emit(buf, "%s\n",
+			  mdwc->usb_data_enabled ? "enabled" : "disabled");
+}
+
+static ssize_t usb_data_enabled_store(struct device *dev,
+				      struct device_attribute *attr,
+				      const char *buf, size_t count)
+{
+	struct dwc3_msm *mdwc = dev_get_drvdata(dev);
+
+	if (kstrtobool(buf, &mdwc->usb_data_enabled))
+		return -EINVAL;
+
+	if (!mdwc->usb_data_enabled) {
+		mdwc->vbus_active = false;
+		mdwc->id_state = DWC3_ID_FLOAT;
+		dwc3_ext_event_notify(mdwc);
+	}
+
+	return count;
+}
+static DEVICE_ATTR_RW(usb_data_enabled);
+
 void usb_reset_host(void)
 {
 	struct dwc3_msm *mdwc = container_of(rst_work, struct dwc3_msm, rst_work);
 	if (rst_work != NULL)
 		queue_delayed_work(mdwc->sm_usb_wq, rst_work, 0);
 }
+
 EXPORT_SYMBOL(usb_reset_host);
 
 static void usb_reset_work(struct work_struct *w)
@@ -3797,34 +3827,6 @@ static void usb_reset_work(struct work_struct *w)
 		}
 	}
 }
-
-static ssize_t usb_data_enabled_show(struct device *dev,
-				     struct device_attribute *attr, char *buf)
-{
-	struct dwc3_msm *mdwc = dev_get_drvdata(dev);
-
-	return sysfs_emit(buf, "%s\n",
-			  mdwc->usb_data_enabled ? "enabled" : "disabled");
-}
-
-static ssize_t usb_data_enabled_store(struct device *dev,
-				      struct device_attribute *attr,
-				      const char *buf, size_t count)
-{
-	struct dwc3_msm *mdwc = dev_get_drvdata(dev);
-
-	if (kstrtobool(buf, &mdwc->usb_data_enabled))
-		return -EINVAL;
-
-	if (!mdwc->usb_data_enabled) {
-		mdwc->vbus_active = false;
-		mdwc->id_state = DWC3_ID_FLOAT;
-		dwc3_ext_event_notify(mdwc);
-	}
-
-	return count;
-}
-static DEVICE_ATTR_RW(usb_data_enabled);
 
 static int dwc3_msm_probe(struct platform_device *pdev)
 {
@@ -4082,6 +4084,7 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 				mdwc->bus_scale_table->num_usecases)
 			mdwc->default_bus_vote = BUS_VOTE_NOMINAL;
 		if (strstr(mdwc->bus_scale_table->name, "usb1")) {
+			dev_dbg(&pdev->dev, "%s: USB1 Init RST workqueue!\n", __func__);
 			INIT_DELAYED_WORK(&mdwc->rst_work, usb_reset_work);
 			rst_work = &mdwc->rst_work;
 		}
@@ -4397,7 +4400,7 @@ static void msm_dwc3_perf_vote_work(struct work_struct *w)
 			msecs_to_jiffies(1000 * PM_QOS_SAMPLE_SEC));
 }
 
-#if defined(CONFIG_BOARD_DAGU) && !defined(CONFIG_NO_PS_USB3)
+#if defined(CONFIG_MACH_XIAOMI_DAGU) || !defined(CONFIG_NO_PS_USB3)
 extern bool has_dp_flag;
 #endif
 
@@ -4519,7 +4522,7 @@ static int dwc3_otg_start_host(struct dwc3_msm *mdwc, int on)
 		schedule_delayed_work(&mdwc->perf_vote_work,
 				msecs_to_jiffies(1000 * PM_QOS_SAMPLE_SEC));
 
-#if defined(CONFIG_BOARD_DAGU) && !defined(CONFIG_NO_PS_USB3)
+#if defined(CONFIG_MACH_XIAOMI_DAGU) && !defined(CONFIG_NO_PS_USB3)
 		if (!has_dp_flag)
 			ps5169_cfg_usb();
 #endif
@@ -4644,7 +4647,7 @@ static int dwc3_otg_start_peripheral(struct dwc3_msm *mdwc, int on)
 		schedule_delayed_work(&mdwc->perf_vote_work,
 				msecs_to_jiffies(1000 * PM_QOS_SAMPLE_SEC));
 
-#if defined(CONFIG_BOARD_DAGU) && !defined(CONFIG_NO_PS_USB3)
+#if defined(CONFIG_MACH_XIAOMI_DAGU) && !defined(CONFIG_NO_PS_USB3)
 		if (!has_dp_flag)
 			ps5169_cfg_usb();
 #endif
