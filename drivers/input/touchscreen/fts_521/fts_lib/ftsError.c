@@ -41,16 +41,16 @@ static ErrorList errors;
 */
 void logError(int force, const char *msg, ...)
 {
-	if (force == 1
 #ifdef DEBUG
+	if (force == 1
 	    || 1
-#endif
 	    ) {
 		va_list args;
 		va_start(args, msg);
 		vprintk(msg, args);
 		va_end(args);
 	}
+#endif
 }
 
 /**

@@ -4,6 +4,7 @@
  * FTS Capacitive touch screen controller (FingerTipS)
  *
  * Copyright (C) 2017, STMicroelectronics
+ * Copyright (C) 2021 XiaoMi, Inc.
  * Authors: AMG(Analog Mems Group)
  *
  * 		marco.cali@st.com
@@ -163,7 +164,7 @@ do {\
 #define FTS_RESULT_FAIL 1
 #define FTS_SELFTEST_FORCE_CAL
 
-#define GRIP_MODE_DEBUG
+#define GRIP_MODE_DEBUG	0
 #define GRIP_RECT_NUM 12
 #define GRIP_PARAMETER_NUM 8
 #define GRIP_TYPE 3
@@ -410,8 +411,6 @@ struct fts_ts_info {
 	int orientation;
 	struct work_struct switch_mode_work;
 	struct work_struct grip_mode_work;
-	struct delayed_work grip_mode_delay_work;
-	struct delayed_work cmd_update_delay_work;
 	bool big_area_fod;
 	struct delayed_work power_supply_work;
 	int charging_status;

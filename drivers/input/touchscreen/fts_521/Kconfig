@@ -15,9 +15,10 @@ config TOUCHSCREEN_FOD
           Say Y here to enable  fod area report functionality.
 
           If unsure, say N.
+
 config TOUCHSCREEN_ST_DEBUG_FS
 	tristate "St core driver module"
-	depends on TOUCHSCREEN_ST_FTS_V521
+	depends on TOUCHSCREEN_ST_FTS_V521 && DEBUG_FS
 	help
           Say Y here to enable  touch debugfs functionality.
 
