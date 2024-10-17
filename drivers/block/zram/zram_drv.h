@@ -45,6 +45,7 @@
 #define ZRAM_FLAG_SHIFT (PAGE_SHIFT + 1)
 #else
 #define ZRAM_FLAG_SHIFT 24
+#endif
 
 /* Flags for zram pages (table[page_no].flags) */
 enum zram_pageflags {
