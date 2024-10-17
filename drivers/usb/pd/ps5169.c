@@ -303,6 +303,7 @@ static void ps5169_config_usb_dp_mode(struct ps5169_info *info, int flip)
 	pr_info("%s: flip:%d.\n", __func__, flip);
 	if (flip == 1)
 		ret |= ps5169_update_reg(info, 0x40, 0xe0);		
+	else if (flip == 2)
 		ret |= ps5169_update_reg(info, 0x40, 0xf0);		
 
 	ret |= ps5169_update_reg(info, 0xa0, 0x00);		
