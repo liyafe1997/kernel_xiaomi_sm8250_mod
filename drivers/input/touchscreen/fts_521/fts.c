@@ -3747,40 +3747,40 @@ static void fts_enter_pointer_event_handler(struct fts_ts_info *info,
 		input_report_key(info->input_dev, BTN_TOOL_FINGER, 1);
 
 	/*input_report_abs(info->input_dev, ABS_MT_TRACKING_ID, touchId); */
-		input_report_abs(info->input_dev, ABS_MT_POSITION_X, x);
-		input_report_abs(info->input_dev, ABS_MT_POSITION_Y, y);
-		if (info->big_area_fod) {
-			input_report_abs(info->input_dev, ABS_MT_TOUCH_MAJOR, info->width_major);
-			input_report_abs(info->input_dev, ABS_MT_TOUCH_MINOR, info->width_minor);
-			input_report_abs(info->input_dev, ABS_MT_ORIENTATION, info->orientation);
-		}
-		input_report_abs(info->input_dev, ABS_MT_DISTANCE, distance);
+	input_report_abs(info->input_dev, ABS_MT_POSITION_X, x);
+	input_report_abs(info->input_dev, ABS_MT_POSITION_Y, y);
+	if (info->big_area_fod) {
+		input_report_abs(info->input_dev, ABS_MT_TOUCH_MAJOR, info->width_major);
+		input_report_abs(info->input_dev, ABS_MT_TOUCH_MINOR, info->width_minor);
+		input_report_abs(info->input_dev, ABS_MT_ORIENTATION, info->orientation);
+	}
+	input_report_abs(info->input_dev, ABS_MT_DISTANCE, distance);
 #ifdef CONFIG_TOUCHSCREEN_FOD
-		if (fts_is_in_fodarea(x, y) && !(info->fod_id & ~(1 << touchId))) {
-			__set_bit(touchId, &info->sleep_finger);
-			if (fts_fingerprint_is_enable()) {
-				info->fod_x = x;
-				info->fod_y = y;
-				info->fod_coordinate_update = true;
-				__set_bit(touchId, &info->fod_id);
-				input_report_abs(info->input_dev, ABS_MT_WIDTH_MINOR, info->fod_overlap);
-				if (!info->board->support_fod)
-					input_report_key(info->input_dev, BTN_INFO, 1);
-			}
-		} else if (__test_and_clear_bit(touchId, &info->fod_id)) {
-			input_report_abs(info->input_dev, ABS_MT_WIDTH_MINOR, 0);
-			input_report_key(info->input_dev, BTN_INFO, 0);
-			info->fod_x = 0;
-			info->fod_y = 0;
-			info->fod_coordinate_update = false;
-			MI_TOUCH_LOGN(1, "%s %s: FOD Up\n", tag, __func__);
-			__clear_bit(touchId, &info->sleep_finger);
+	if (fts_is_in_fodarea(x, y) && !(info->fod_id & ~(1 << touchId))) {
+		__set_bit(touchId, &info->sleep_finger);
+		if (fts_fingerprint_is_enable()) {
+			info->fod_x = x;
+			info->fod_y = y;
+			info->fod_coordinate_update = true;
+			__set_bit(touchId, &info->fod_id);
+			input_report_abs(info->input_dev, ABS_MT_WIDTH_MINOR, info->fod_overlap);
+			if (!info->board->support_fod)
+				input_report_key(info->input_dev, BTN_INFO, 1);
 		}
+	} else if (__test_and_clear_bit(touchId, &info->fod_id)) {
+		input_report_abs(info->input_dev, ABS_MT_WIDTH_MINOR, 0);
+		input_report_key(info->input_dev, BTN_INFO, 0);
+		info->fod_x = 0;
+		info->fod_y = 0;
+		info->fod_coordinate_update = false;
+		MI_TOUCH_LOGN(1, "%s %s: FOD Up\n", tag, __func__);
+		__clear_bit(touchId, &info->sleep_finger);
+	}
 #endif
-		input_sync(info->input_dev);
-		MI_TOUCH_LOGD(0,
-			"%s %s: Event 0x%02x - ID[%d], (x, y, z) = (%3d, %3d, %3d) type = %d, size = %d, overlap:%d\n",
-			tag, __func__, *event, touchId, x, y, z, touchType, area_size, info->fod_overlap);
+	input_sync(info->input_dev);
+	MI_TOUCH_LOGD(0,
+		"%s %s: Event 0x%02x - ID[%d], (x, y, z) = (%3d, %3d, %3d) type = %d, size = %d, overlap:%d\n",
+		tag, __func__, *event, touchId, x, y, z, touchType, area_size, info->fod_overlap);
 	if (event[0] == 0x13)
 		MI_TOUCH_LOGI(1,
 			"%s %s: Event 0x%02x - Press ID[%d]\n", tag, __func__, event[0], touchId);
