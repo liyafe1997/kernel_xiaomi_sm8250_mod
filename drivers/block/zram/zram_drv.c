@@ -16,6 +16,7 @@
 #define KMSG_COMPONENT "ExtM"
 #else
 #define KMSG_COMPONENT "zram"
+#endif
 #define pr_fmt(fmt) KMSG_COMPONENT ": " fmt
 #define MAGIC_NUMBER 8988778932
 
