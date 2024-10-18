@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -169,6 +170,16 @@ static int dp_parser_misc(struct dp_parser *parser)
 	parser->display_type = of_get_property(of_node, "label", NULL);
 	if (!parser->display_type)
 		parser->display_type = "unknown";
+
+	rc = of_property_read_u32(of_node,
+		"qcom,max-hdisplay", &parser->max_hdisplay);
+	if (rc)
+		parser->max_hdisplay = 0;
+
+	rc = of_property_read_u32(of_node,
+		"qcom,max-vdisplay", &parser->max_vdisplay);
+	if (rc)
+		parser->max_vdisplay = 0;
 
 	return 0;
 }

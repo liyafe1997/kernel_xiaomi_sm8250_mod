@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
  */
 
@@ -2284,6 +2285,7 @@ struct dp_debug *dp_debug_get(struct dp_debug_in *in)
 	dp_debug->dp_mst_connector_list.con_id = -1;
 	dp_debug->dp_mst_connector_list.conn = NULL;
 	dp_debug->dp_mst_connector_list.debug_en = false;
+	mutex_init(&dp_debug->dp_mst_connector_list.lock);
 
 	dp_debug->max_pclk_khz = debug->parser->max_pclk_khz;
 

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define pr_fmt(fmt)	"[drm:%s:%d] " fmt, __func__, __LINE__
@@ -87,22 +88,11 @@ static int sde_backlight_device_update_status(struct backlight_device *bd)
 	c_conn = bl_get_data(bd);
 	display = (struct dsi_display *) c_conn->display;
 
-	if((display->panel->mi_cfg.panel_id == 0x4C38314100420400 ||
-		display->panel->mi_cfg.panel_id == 0x004B383100350201 ||
-		display->panel->mi_cfg.panel_id == 0x004B383100420200 ||
-		display->panel->mi_cfg.panel_id == 0x4A3200420201||
-		display->panel->mi_cfg.panel_id == 0x004A3200420201||
-		display->panel->mi_cfg.panel_id == 0x004A3200380c00)
-		&& (bd->thermal_brightness_limit != 0)) {
+	if((display->panel->mi_cfg.panel_id == 0x4C38314100420400) && (bd->thermal_brightness_limit != 0)) {
 		brightness = (brightness <= bd->thermal_brightness_limit) ? brightness : bd->thermal_brightness_limit;
 		bd->props.brightness = brightness;
 	}
-	if((display->panel->mi_cfg.panel_id == 0x4D38324100360200||
-		display->panel->mi_cfg.panel_id == 0x4D38324100420200)
-		&& (bd->thermal_brightness_clone_limit != 0)) {
-		brightness = (brightness <= bd->thermal_brightness_clone_limit) ? brightness : bd->thermal_brightness_clone_limit;
-		bd->props.brightness = brightness;
-	}
+
 	if ((bd->props.power != FB_BLANK_UNBLANK) ||
 			(bd->props.state & BL_CORE_FBBLANK) ||
 			(bd->props.state & BL_CORE_SUSPENDED))
@@ -175,7 +165,6 @@ static int sde_backlight_setup(struct sde_connector *c_conn,
 	bl_config = &display->panel->bl_config;
 	props.max_brightness = bl_config->brightness_max_level;
 	props.brightness = bl_config->brightness_init_level;
-	props.brightness_clone_backup = 307;
 	snprintf(bl_node_name, BL_NODE_NAME_SIZE, "panel%u-backlight",
 							display_count);
 	c_conn->bl_device = backlight_device_register(bl_node_name, dev->dev,
@@ -785,7 +774,6 @@ static int _sde_connector_update_dirty_properties(
 	return 0;
 }
 
-
 void sde_connector_update_fod_hbm(struct drm_connector *connector)
 {
 	static atomic_t effective_status = ATOMIC_INIT(false);
@@ -943,10 +931,6 @@ static int _sde_connector_mi_dimlayer_hbm_fence(struct drm_connector *connector)
 	static bool last_layer_aod_flag;
 	bool crc_off_after_delay_of_hbm_on = false;
 	struct dsi_panel_mi_cfg *mi_cfg;
-#if 0
-	bool icon;
-	static bool last_icon = false;
-#endif
 	bool anim;
 	static bool last_anim = false;
 
@@ -1330,6 +1314,7 @@ void sde_connector_helper_bridge_enable(struct drm_connector *connector)
 
 	c_conn = to_sde_connector(connector);
 	display = (struct dsi_display *) c_conn->display;
+
 	/*
 	 * Special handling for some panels which need atleast
 	 * one frame to be transferred to GRAM before enabling backlight.
@@ -2366,99 +2351,6 @@ static const struct file_operations conn_cmd_tx_fops = {
 	.write =	_sde_debugfs_conn_cmd_tx_write,
 };
 
-static void _sde_connector_report_panel_dead(struct sde_connector *conn, bool skip_pre_kickoff);
-static int _sde_debugfs_conn_esd_test_open(struct inode *inode, struct file *file)
-{
-	/* non-seekable */
-	file->private_data = inode->i_private;
-	return nonseekable_open(inode, file);
-}
-
-
-static ssize_t _sde_debugfs_conn_esd_test_write(struct file *file,
-			const char __user *p, size_t count, loff_t *ppos)
-{
-	struct drm_connector *connector = file->private_data;
-	struct sde_connector *c_conn = to_sde_connector(connector);
-	struct dsi_display *display = c_conn->display;
-	struct drm_event event;
-	int power_mode;
-	char *input;
-	int rc = 0;
-	const char *sde_power_mode_str[] = {
-		[SDE_MODE_DPMS_ON] = "SDE_MODE_DPMS_ON",
-		[SDE_MODE_DPMS_LP1] = "SDE_MODE_DPMS_LP1",
-		[SDE_MODE_DPMS_LP2] = "SDE_MODE_DPMS_LP2",
-		[SDE_MODE_DPMS_STANDBY] = "SDE_MODE_DPMS_STANDBY",
-		[SDE_MODE_DPMS_SUSPEND] = "SDE_MODE_DPMS_SUSPEND",
-		[SDE_MODE_DPMS_OFF] = "SDE_MODE_DPMS_OFF",
-	};
-
-	if (!display || !display->panel) {
-		SDE_ERROR("invalid display/panel\n");
-		return -EINVAL;
-	}
-
-	input = kmalloc(count + 1, GFP_KERNEL);
-	if (!input)
-		return -ENOMEM;
-
-	if (copy_from_user(input, p, count)) {
-		SDE_ERROR("copy from user failed\n");
-		rc = -EFAULT;
-		goto end;
-	}
-	input[count] = '\0';
-	DSI_INFO("[esd-test]intput esd test: %s\n", input);
-
-	if (!strncmp(input, "1", 1) || !strncmp(input, "on", 2) ||
-		!strncmp(input, "true", 4)) {
-		DSI_INFO("[esd-test]panel esd irq trigging \n");
-	} else {
-		goto end;
-	}
-	if (c_conn->connector_type == DRM_MODE_CONNECTOR_DSI) {
-		if (dsi_panel_initialized(display->panel)) {
-			if (atomic_read(&(display->panel->esd_recovery_pending))) {
-				SDE_ERROR("[esd-test]ESD recovery already pending\n");
-				rc = count;
-				goto end;
-			}
-			power_mode = display->panel->power_mode;
-			DSI_INFO("[esd-test]power_mode = %s\n", sde_power_mode_str[power_mode]);
-			if (power_mode == SDE_MODE_DPMS_ON ||
-				power_mode == SDE_MODE_DPMS_LP1) {
-				atomic_set(&display->panel->esd_recovery_pending, 1);
-				_sde_connector_report_panel_dead(c_conn, false);
-			} else {
-				if (!c_conn->panel_dead) {
-					atomic_set(&display->panel->esd_recovery_pending, 1);
-					c_conn->panel_dead = true;
-					event.type = DRM_EVENT_PANEL_DEAD;
-					event.length = sizeof(bool);
-					msm_mode_object_event_notify(&c_conn->base.base,
-						c_conn->base.dev, &event, (u8 *)&c_conn->panel_dead);
-					SDE_EVT32(SDE_EVTLOG_ERROR);
-					SDE_ERROR("[esd-test]esd irq check failed report PANEL_DEAD"
-						" conn_id: %d enc_id: %d\n",
-						c_conn->base.base.id, c_conn->encoder->base.id);
-				}
-			}
-			rc = count;
-		}
-	}
-
-end:
-	kfree(input);
-	return rc;
-}
-
-
-static const struct file_operations conn_esd_test_fops = {
-	.open  = _sde_debugfs_conn_esd_test_open,
-	.write = _sde_debugfs_conn_esd_test_write,
-};
-
 #ifdef CONFIG_DEBUG_FS
 /**
  * sde_connector_init_debugfs - initialize connector debugfs
@@ -2497,13 +2389,6 @@ static int sde_connector_init_debugfs(struct drm_connector *connector)
 			SDE_ERROR("failed to create connector cmd_tx\n");
 			return -ENOMEM;
 		}
-	}
-
-	if (!debugfs_create_file("esd_test", 0600,
-		connector->debugfs_entry,
-		connector, &conn_esd_test_fops)) {
-		SDE_ERROR("[esd-test]failed to create connector esd_test\n");
-		return -ENOMEM;
 	}
 
 	return 0;
@@ -2705,10 +2590,8 @@ static void _sde_connector_report_panel_dead(struct sde_connector *conn,
 	 * 2) Commit thread (if TE stops coming)
 	 * So such case, avoid failure notification twice.
 	 */
-	if (conn->panel_dead) {
-		SDE_INFO("panel_dead is true, return!\n");
+	if (conn->panel_dead)
 		return;
-	}
 
 	conn->panel_dead = true;
 	display->panel->mi_cfg.panel_dead_flag = true;
@@ -2812,14 +2695,6 @@ static irqreturn_t esd_err_irq_handle(int irq, void *data)
 	struct dsi_display *display = c_conn->display;
 	struct drm_event event;
 	int power_mode;
-	const char *sde_power_mode_str[] = {
-		[SDE_MODE_DPMS_ON] = "SDE_MODE_DPMS_ON",
-		[SDE_MODE_DPMS_LP1] = "SDE_MODE_DPMS_LP1",
-		[SDE_MODE_DPMS_LP2] = "SDE_MODE_DPMS_LP2",
-		[SDE_MODE_DPMS_STANDBY] = "SDE_MODE_DPMS_STANDBY",
-		[SDE_MODE_DPMS_SUSPEND] = "SDE_MODE_DPMS_SUSPEND",
-		[SDE_MODE_DPMS_OFF] = "SDE_MODE_DPMS_OFF",
-	};
 
 	if (!display || !display->panel) {
 		SDE_ERROR("invalid display/panel\n");
@@ -2831,8 +2706,6 @@ static irqreturn_t esd_err_irq_handle(int irq, void *data)
 		SDE_ERROR("trigger esd by mistake,return\n");
 		return IRQ_HANDLED;
 	}
-
-	DSI_INFO("panel esd irq trigging \n");
 
 	if (c_conn->connector_type == DRM_MODE_CONNECTOR_DSI) {
 		dsi_panel_acquire_panel_lock(display->panel);
@@ -2862,7 +2735,6 @@ static irqreturn_t esd_err_irq_handle(int irq, void *data)
 		}
 
 		power_mode = display->panel->power_mode;
-		DSI_INFO("power_mode = %s\n", sde_power_mode_str[power_mode]);
 
 		dsi_panel_release_panel_lock(display->panel);
 
@@ -2890,7 +2762,6 @@ static int sde_connector_register_esd_irq(struct sde_connector *c_conn)
 {
 	struct dsi_display *display = c_conn->display;
 	int rc = 0;
-	int rc2 = 0;
 
 	/* register esd irq and enable it after panel enabled */
 	if (c_conn->connector_type == DRM_MODE_CONNECTOR_DSI) {
@@ -2898,40 +2769,16 @@ static int sde_connector_register_esd_irq(struct sde_connector *c_conn)
 			SDE_ERROR("invalid display/panel\n");
 			return -EINVAL;
 		}
-		if((display->panel->mi_cfg.panel_id == 0x4D38324100360200) || (display->panel->mi_cfg.panel_id == 0x4D38324100420200))
-		{
-			if ((display->panel->mi_cfg.esd_err_irq_gpio > 0) && (display->panel->mi_cfg.esd_err_irq_gpio_sec > 0)) {
-				rc = request_threaded_irq(display->panel->mi_cfg.esd_err_irq,
-					NULL, esd_err_irq_handle,
-					display->panel->mi_cfg.esd_err_irq_flags,
-					"esd_err_irq", c_conn);
-				rc2 = request_threaded_irq(display->panel->mi_cfg.esd_err_irq_sec,
-					NULL, esd_err_irq_handle,
-					display->panel->mi_cfg.esd_err_irq_gpio_flags_sec,
-					"esd_err_irq_sec", c_conn);
-	
-				if (rc || rc2) {
-					SDE_ERROR("register esd irq failed\n");
-				} else {
-					SDE_INFO("register esd irq success\n");
-					disable_irq(display->panel->mi_cfg.esd_err_irq);
-					disable_irq(display->panel->mi_cfg.esd_err_irq_sec);
-				}
-			}
-			SDE_ERROR("sde_connector_register_esd_irq %d\n",(rc || rc2));
-			return (rc || rc2);
-		}else{
-			if (display->panel->mi_cfg.esd_err_irq_gpio > 0) {
-				rc = request_threaded_irq(display->panel->mi_cfg.esd_err_irq,
-					NULL, esd_err_irq_handle,
-					display->panel->mi_cfg.esd_err_irq_flags,
-					"esd_err_irq", c_conn);
-				if (rc) {
-					SDE_ERROR("register esd irq failed\n");
-				} else {
-					SDE_INFO("register esd irq success\n");
-					disable_irq(display->panel->mi_cfg.esd_err_irq);
-				}
+		if (display->panel->mi_cfg.esd_err_irq_gpio > 0) {
+			rc = request_threaded_irq(display->panel->mi_cfg.esd_err_irq,
+				NULL, esd_err_irq_handle,
+				display->panel->mi_cfg.esd_err_irq_flags,
+				"esd_err_irq", c_conn);
+			if (rc) {
+				SDE_ERROR("register esd irq failed\n");
+			} else {
+				SDE_INFO("register esd irq success\n");
+				disable_irq(display->panel->mi_cfg.esd_err_irq);
 			}
 		}
 	}
@@ -3051,7 +2898,7 @@ int sde_connector_set_blob_data(struct drm_connector *conn,
 		return -EINVAL;
 	}
 
-	info = kzalloc(sizeof(*info), GFP_KERNEL);
+	info = vzalloc(sizeof(*info));
 	if (!info)
 		return -ENOMEM;
 
@@ -3109,7 +2956,7 @@ int sde_connector_set_blob_data(struct drm_connector *conn,
 			SDE_KMS_INFO_DATALEN(info),
 			prop_id);
 exit:
-	kfree(info);
+	vfree(info);
 
 	return rc;
 }
@@ -3394,7 +3241,6 @@ struct drm_connector *sde_connector_init(struct drm_device *dev,
 
 	sde_connector_register_esd_irq(c_conn);
 
-
 	return &c_conn->base;
 
 error_destroy_property:
@@ -3497,10 +3343,7 @@ int sde_connector_event_notify(struct drm_connector *connector, uint32_t type,
 int sde_connector_hbm_ctl(struct drm_connector *connector, uint32_t op_code)
 {
 	int ret = 0;
-
-	SDE_ATRACE_BEGIN("sde_connector_hbm_ctl");
 	ret = dsi_display_hbm_set_disp_param(connector, op_code);
-	SDE_ATRACE_END("sde_connector_hbm_ctl");
 	return ret;
 }
 
@@ -3519,9 +3362,6 @@ static uint32_t interpolate(uint32_t x, uint32_t xa, uint32_t xb, uint32_t ya, u
 	uint32_t bf;
 
 	bf = ya - (ya - yb) * (x - xa) / (xb - xa);
-
-	SDE_DEBUG("backlight brightness:%d, [i-1]bl:%d, [i]bl:%d, [i-1]alpha:%d, [i]alpha:%d, bf:%d",
-			x, xa, xb, ya, yb, bf);
 
 	return bf;
 }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/of_platform.h>
@@ -292,10 +293,18 @@ static void dp_audio_isrc_sdp(struct dp_audio_private *audio)
 
 static void dp_audio_setup_sdp(struct dp_audio_private *audio)
 {
+	struct sde_edid_ctrl *edid;
+
 	if (!atomic_read(&audio->session_on)) {
 		DP_WARN("session inactive\n");
 		return;
 	}
+
+	if (!audio->panel || !audio->panel->edid_ctrl) {
+		DP_ERR("Invalid panel data.");
+		return;
+	}
+	edid = audio->panel->edid_ctrl;
 
 	/* always program stream 0 first before actual stream cfg */
 	audio->catalog->stream_id = DP_STREAM_0;
@@ -309,8 +318,14 @@ static void dp_audio_setup_sdp(struct dp_audio_private *audio)
 	dp_audio_stream_sdp(audio);
 	dp_audio_timestamp_sdp(audio);
 	dp_audio_infoframe_sdp(audio);
-	dp_audio_copy_management_sdp(audio);
-	dp_audio_isrc_sdp(audio);
+
+	DP_DEBUG("Sink supports ACP and ISRC: %d",
+		edid->hdmi_vsdb.supports_ai);
+
+	if (edid->hdmi_vsdb.supports_ai) {
+		dp_audio_copy_management_sdp(audio);
+		dp_audio_isrc_sdp(audio);
+	}
 }
 
 static void dp_audio_setup_acr(struct dp_audio_private *audio)

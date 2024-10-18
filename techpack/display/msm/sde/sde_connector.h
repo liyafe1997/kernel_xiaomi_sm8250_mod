@@ -449,7 +449,6 @@ struct mi_dimlayer_state
  * last_cmd_tx_sts: status of the last command transfer
  * @hdr_capable: external hdr support present
  * @core_clk_rate: MDP core clk rate used for dynamic HDR packet calculation
- * @mi_dimlayer_state: mi dimlayer state
  */
 struct sde_connector {
 	struct drm_connector base;
@@ -991,6 +990,7 @@ int sde_connector_get_panel_vfp(struct drm_connector *connector,
  * @connector: Pointer to DRM connector object
  */
 int sde_connector_esd_status(struct drm_connector *connector);
+
 /**
  * sde_connector_hbm_ctl - mi function to control hbm
  * @connector: Pointer to DRM connector object

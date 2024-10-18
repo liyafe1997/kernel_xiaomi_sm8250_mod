@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/of_device.h>
@@ -880,13 +881,13 @@ int dsi_phy_enable(struct msm_dsi_phy *phy,
 
 	memcpy(&phy->mode, &config->video_timing, sizeof(phy->mode));
 	memcpy(&phy->cfg.lane_map, &config->lane_map, sizeof(config->lane_map));
-	phy->data_lanes = config->common_config.data_lanes;
 	phy->dst_format = config->common_config.dst_format;
+	phy->cfg.data_lanes = config->common_config.data_lanes;
 	phy->cfg.pll_source = pll_source;
 	phy->cfg.bit_clk_rate_hz = config->bit_clk_rate_hz;
 	phy->cfg.clk_strength = config->common_config.clk_strength;
 	phy->cfg.cphy_strength = config->common_config.cphy_strength;
-	phy->cfg.phy_voltage = config->common_config.phy_voltage;
+
 	/**
 	 * If PHY timing parameters are not present in panel dtsi file,
 	 * then calculate them in the driver

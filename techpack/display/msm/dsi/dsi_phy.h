@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2016-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _DSI_PHY_H_
@@ -68,7 +69,6 @@ enum phy_ulps_return_type {
  * @power_state:       True if PHY is powered on.
  * @dsi_phy_state:     PHY state information.
  * @mode:              Current mode.
- * @data_lanes:        Number of data lanes used.
  * @dst_format:        Destination format.
  * @allow_phy_power_off: True if PHY is allowed to power off when idle
  * @regulator_min_datarate_bps: Minimum per lane data rate to turn on regulator
@@ -92,7 +92,6 @@ struct msm_dsi_phy {
 	enum phy_engine_state dsi_phy_state;
 	bool power_state;
 	struct dsi_mode_info mode;
-	enum dsi_data_lanes data_lanes;
 	enum dsi_pixel_format dst_format;
 
 	bool allow_phy_power_off;

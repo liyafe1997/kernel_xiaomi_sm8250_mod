@@ -281,6 +281,5 @@ void dsi_ctrl_hw_22_configure_cmddma_window(struct dsi_ctrl_hw *ctrl,
 void dsi_ctrl_hw_22_reset_trigger_controls(struct dsi_ctrl_hw *ctrl,
 		struct dsi_host_common_cfg *cfg);
 
-
 u32 dsi_ctrl_hw_22_log_line_count(struct dsi_ctrl_hw *ctrl, bool cmd_mode);
 #endif /* _DSI_CATALOG_H_ */

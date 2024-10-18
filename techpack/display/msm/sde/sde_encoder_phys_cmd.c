@@ -239,8 +239,6 @@ static void sde_encoder_phys_cmd_te_rd_ptr_irq(void *arg, int irq_idx)
 	if (!phys_enc || !phys_enc->hw_pp || !phys_enc->hw_intf)
 		return;
 
-	sde_encoder_save_vsync_info(phys_enc);
-
 	SDE_ATRACE_BEGIN("rd_ptr_irq");
 	cmd_enc = to_sde_encoder_phys_cmd(phys_enc);
 	ctl = phys_enc->hw_ctl;

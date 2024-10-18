@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2015-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _DSI_PHY_HW_H_
@@ -96,6 +97,7 @@ struct dsi_phy_per_lane_cfgs {
  * @is_phy_timing_present:	Boolean whether phy timings are defined.
  * @regulators:       Regulator settings for lanes.
  * @pll_source:       PLL source.
+ * @data_lanes:       Number of data lanes used.
  * @lane_map:         DSI logical to PHY lane mapping.
  * @force_clk_lane_hs:Boolean whether to force clock lane in HS mode.
  * @phy_type:         Phy-type (Dphy/Cphy).
@@ -112,9 +114,9 @@ struct dsi_phy_cfg {
 	bool force_clk_lane_hs;
 	enum dsi_phy_type phy_type;
 	unsigned long bit_clk_rate_hz;
+	u32 data_lanes;
 	unsigned long clk_strength;
 	bool cphy_strength;
-	unsigned long phy_voltage;
 };
 
 struct dsi_phy_hw;

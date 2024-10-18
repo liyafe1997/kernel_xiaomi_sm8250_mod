@@ -169,6 +169,7 @@ enum sde_stage {
 	SDE_STAGE_8,
 	SDE_STAGE_9,
 	SDE_STAGE_10,
+	SDE_STAGE_11,
 	SDE_STAGE_MAX
 };
 

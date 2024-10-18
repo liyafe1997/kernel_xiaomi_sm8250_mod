@@ -193,7 +193,9 @@ static void dsi_bridge_pre_enable(struct drm_bridge *bridge)
 		return;
 	}
 
-	atomic_set(&c_bridge->display->panel->esd_recovery_pending, 0);
+	if (bridge->encoder->crtc->state->active_changed)
+		atomic_set(&c_bridge->display->panel->esd_recovery_pending, 0);
+
 	mi_cfg = &c_bridge->display->panel->mi_cfg;
 
 	/* By this point mode should have been validated through mode_fixup */
@@ -228,7 +230,6 @@ static void dsi_bridge_pre_enable(struct drm_bridge *bridge)
 	notify_data.id = MSM_DRM_PRIMARY_DISPLAY;
 	mi_drm_notifier_call_chain(MI_DRM_EARLY_EVENT_BLANK, &notify_data);
 
-
 	if (c_bridge->dsi_mode.dsi_mode_flags &
 		(DSI_MODE_FLAG_SEAMLESS | DSI_MODE_FLAG_VRR |
 		 DSI_MODE_FLAG_DYN_CLK)) {
@@ -261,55 +262,9 @@ static void dsi_bridge_pre_enable(struct drm_bridge *bridge)
 	if (rc)
 		DSI_ERR("Continuous splash pipeline cleanup failed, rc=%d\n",
 									rc);
-
 	if (c_bridge->display->is_prim_display)
 		atomic_set(&prim_panel_is_on, true);
-
 }
-
-/**
- *  dsi_bridge_interface_enable - Panel light on interface for fingerprint
- *  In order to improve panel light on performance when unlock device by
- *  fingerprint, export this interface for fingerprint.Once finger touch
- *  happened, it could light on LCD panel in advance of android resume.
- *
- *  @timeout: DSI bridge wait time for android resume and set panel on.
- *            If timeout, dsi bridge will disable panel to avoid fingerprint
- *            touch by mistake.
- */
-
-int dsi_bridge_interface_enable(int timeout)
-{
-	int ret = 0;
-
-	ret = wait_event_timeout(resume_wait_q,
-		!atomic_read(&resume_pending),
-		msecs_to_jiffies(WAIT_RESUME_TIMEOUT));
-	if (!ret) {
-		pr_info("Primary fb resume timeout\n");
-		return -ETIMEDOUT;
-	}
-
-	mutex_lock(&gbridge->base.lock);
-
-	if (atomic_read(&prim_panel_is_on)) {
-		mutex_unlock(&gbridge->base.lock);
-		return 0;
-	}
-
-	__pm_stay_awake(prim_panel_wakelock);
-	gbridge->dsi_mode.dsi_mode_flags = 0;
-	dsi_bridge_pre_enable(&gbridge->base);
-
-	if (timeout > 0)
-		schedule_delayed_work(&prim_panel_work, msecs_to_jiffies(timeout));
-	else
-		__pm_relax(prim_panel_wakelock);
-
-	mutex_unlock(&gbridge->base.lock);
-	return ret;
-}
-EXPORT_SYMBOL(dsi_bridge_interface_enable);
 
 static void dsi_bridge_enable(struct drm_bridge *bridge)
 {
@@ -446,10 +401,8 @@ static void dsi_bridge_post_disable(struct drm_bridge *bridge)
 
 	mi_drm_notifier_call_chain(MI_DRM_EVENT_BLANK, &notify_data);
 	SDE_ATRACE_END("dsi_bridge_post_disable");
-
 	if (c_bridge->display->is_prim_display)
 		atomic_set(&prim_panel_is_on, false);
-
 }
 
 static void prim_panel_off_delayed_work(struct work_struct *work)
@@ -462,7 +415,7 @@ static void prim_panel_off_delayed_work(struct work_struct *work)
 		return;
 	}
 	mutex_unlock(&gbridge->base.lock);
-}
+} // git
 
 static void dsi_bridge_mode_set(struct drm_bridge *bridge,
 				struct drm_display_mode *mode,
@@ -1170,6 +1123,7 @@ int dsi_conn_post_kickoff(struct drm_connector *connector,
 				return -EINVAL;
 			}
 		}
+
 		c_bridge->dsi_mode.dsi_mode_flags &= ~DSI_MODE_FLAG_VRR;
 	}
 
@@ -1215,11 +1169,9 @@ struct dsi_bridge *dsi_drm_bridge_init(struct dsi_display *display,
 
 	if (display->is_prim_display) {
 		gbridge = bridge;
-		atomic_set(&resume_pending, 0);
 		prim_panel_wakelock = wakeup_source_create("prim_panel_wakelock");
 		wakeup_source_add(prim_panel_wakelock);
 		atomic_set(&prim_panel_is_on, false);
-		init_waitqueue_head(&resume_wait_q);
 		INIT_DELAYED_WORK(&prim_panel_work, prim_panel_off_delayed_work);
 	}
 

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2009-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define pr_fmt(fmt)	"[drm:%s:%d] " fmt, __func__, __LINE__
@@ -198,6 +199,7 @@ struct sde_dbg_regbuf {
  * struct sde_dbg_base - global sde debug base structure
  * @evtlog: event log instance
  * @reglog: reg log instance
+ * @reg_dump_base: base address of register dump region
  * @reg_base_list: list of register dumping regions
  * @dev: device pointer
  * @mutex: mutex to serialize access to serialze dumps, debugfs access
@@ -221,6 +223,7 @@ static struct sde_dbg_base {
 	struct sde_dbg_evtlog *evtlog;
 	struct sde_dbg_reglog *reglog;
 	struct list_head reg_base_list;
+	void *reg_dump_base;
 	void *reg_dump_addr;
 	struct device *dev;
 	struct mutex mutex;
@@ -3251,7 +3254,6 @@ static void _sde_dbg_dump_sde_dbg_bus(struct sde_dbg_sde_debug_bus *bus)
 	u32 *dump_addr = NULL;
 	u32 status = 0;
 	struct sde_debug_bus_entry *head;
-	phys_addr_t phys = 0;
 	int list_size;
 	int i;
 	u32 offset;
@@ -3289,8 +3291,7 @@ static void _sde_dbg_dump_sde_dbg_bus(struct sde_dbg_sde_debug_bus *bus)
 
 	if (in_mem) {
 		if (!(*dump_mem))
-			*dump_mem = dma_alloc_coherent(sde_dbg_base.dev,
-				list_size, &phys, GFP_KERNEL);
+			*dump_mem =  vzalloc(list_size);
 
 		if (*dump_mem) {
 			dump_addr = *dump_mem;
@@ -3400,7 +3401,6 @@ static void _sde_dbg_dump_vbif_dbg_bus(struct sde_dbg_vbif_debug_bus *bus)
 	u32 value, d0, d1;
 	unsigned long reg, reg1, reg2;
 	struct vbif_debug_bus_entry *head;
-	phys_addr_t phys = 0;
 	int i, list_size = 0;
 	void __iomem *mem_base = NULL;
 	struct vbif_debug_bus_entry *dbg_bus;
@@ -3450,8 +3450,7 @@ static void _sde_dbg_dump_vbif_dbg_bus(struct sde_dbg_vbif_debug_bus *bus)
 
 	if (in_mem) {
 		if (!(*dump_mem))
-			*dump_mem = dma_alloc_coherent(sde_dbg_base.dev,
-				list_size, &phys, GFP_KERNEL);
+			*dump_mem =  vzalloc(list_size);
 
 		if (*dump_mem) {
 			dump_addr = *dump_mem;
@@ -3542,13 +3541,18 @@ static void _sde_dump_array(struct sde_dbg_reg_base *blk_arr[],
 	int i;
 	u32 reg_dump_size;
 	struct sde_dbg_base *dbg_base = &sde_dbg_base;
-	phys_addr_t phys = 0;
 
 	mutex_lock(&sde_dbg_base.mutex);
 
 	reg_dump_size =  _sde_dbg_get_reg_dump_size();
-	dbg_base->reg_dump_addr = dma_alloc_coherent(sde_dbg_base.dev,
-			reg_dump_size, &phys, GFP_KERNEL);
+	if (!dbg_base->reg_dump_base)
+		dbg_base->reg_dump_base = vzalloc(reg_dump_size);
+
+	dbg_base->reg_dump_addr =  dbg_base->reg_dump_base;
+
+	if (!dbg_base->reg_dump_addr)
+		pr_err("Failed to allocate memory for reg_dump_addr size:%d\n",
+				reg_dump_size);
 
 	if (dump_all)
 		sde_evtlog_dump_all(sde_dbg_base.evtlog);
@@ -4051,7 +4055,7 @@ static ssize_t sde_recovery_regdump_read(struct file *file, char __user *ubuf,
 	mutex_lock(&sde_dbg_base.mutex);
 	if (!rbuf->dump_done && !rbuf->cur_blk) {
 		if (!rbuf->buf)
-			rbuf->buf = kzalloc(DUMP_BUF_SIZE, GFP_KERNEL);
+			rbuf->buf = vzalloc(DUMP_BUF_SIZE);
 		if (!rbuf->buf) {
 			len =  -ENOMEM;
 			goto err;
@@ -4781,13 +4785,23 @@ static void sde_dbg_reg_base_destroy(void)
 		list_del(&blk_base->reg_base_head);
 		kfree(blk_base);
 	}
+	vfree(dbg_base->reg_dump_base);
 }
+
+static void sde_dbg_buses_destroy(void)
+{
+	struct sde_dbg_base *dbg_base = &sde_dbg_base;
+
+	vfree(dbg_base->dbgbus_sde.cmn.dumped_content);
+	vfree(dbg_base->dbgbus_vbif_rt.cmn.dumped_content);
+}
+
 /**
  * sde_dbg_destroy - destroy sde debug facilities
  */
 void sde_dbg_destroy(void)
 {
-	kfree(sde_dbg_base.regbuf.buf);
+	vfree(sde_dbg_base.regbuf.buf);
 	memset(&sde_dbg_base.regbuf, 0, sizeof(sde_dbg_base.regbuf));
 	_sde_dbg_debugfs_destroy();
 	sde_dbg_base_evtlog = NULL;
@@ -4796,6 +4810,7 @@ void sde_dbg_destroy(void)
 	sde_reglog_destroy(sde_dbg_base.reglog);
 	sde_dbg_base.reglog = NULL;
 	sde_dbg_reg_base_destroy();
+	sde_dbg_buses_destroy();
 	mutex_destroy(&sde_dbg_base.mutex);
 }
 

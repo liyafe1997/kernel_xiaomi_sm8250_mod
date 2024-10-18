@@ -200,6 +200,7 @@ u32 dsi_ctrl_hw_22_log_line_count(struct dsi_ctrl_hw *ctrl, bool cmd_mode)
 
 	return reg;
 }
+
 /**
  * dsi_ctrl_hw_22_configure_cmddma_window() - configure DMA window for CMD TX
  * @ctrl:       Pointer to the controller host hardware.

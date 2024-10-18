@@ -224,10 +224,6 @@ int mi_disp_set_fod_queue_work(u32 fod_btn, bool from_touch)
 	struct dsi_panel_mi_cfg *mi_cfg;
 	static bool ignore_fod_btn = false;
 
-#ifdef CONFIG_FACTORY_BUILD
-	return 0;
-#endif
-
 	if (!dl_ptr) {
 		pr_err("%s invalid params\n", LHBM_TAG);
 		return -EINVAL;

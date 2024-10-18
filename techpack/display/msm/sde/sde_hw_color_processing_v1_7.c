@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2019, The Linux Foundation. All rights reserved.
  */
 
 #include <drm/msm_drm_pp.h>
@@ -958,7 +958,7 @@ void sde_lock_dspp_hist_v1_7(struct sde_hw_dspp *ctx, void *cfg)
 	u32 offset_ctl, val;
 
 	if (!ctx || !cfg) {
-		DRM_ERROR("invalid parameters ctx %pK cfg %pK", ctx, cfg);
+		DRM_ERROR("invalid parameters ctx %pK", ctx);
 		return;
 	}
 

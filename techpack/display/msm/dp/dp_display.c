@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -721,6 +722,11 @@ static void dp_display_send_hpd_event(struct dp_display_private *dp)
 	kobject_uevent_env(&dev->primary->kdev->kobj, KOBJ_CHANGE,
 			envp);
 
+	if (dev->mode_config.funcs->output_poll_changed)
+		dev->mode_config.funcs->output_poll_changed(dev);
+
+	drm_client_dev_hotplug(dev);
+
 	if (connector->status == connector_status_connected) {
 		dp_display_state_add(DP_STATE_CONNECT_NOTIFIED);
 		dp_display_state_remove(DP_STATE_DISCONNECT_NOTIFIED);
@@ -976,6 +982,8 @@ static int dp_display_process_hpd_high(struct dp_display_private *dp)
 
 	dp->dp_display.max_pclk_khz = min(dp->parser->max_pclk_khz,
 					dp->debug->max_pclk_khz);
+	dp->dp_display.max_hdisplay = dp->parser->max_hdisplay;
+	dp->dp_display.max_vdisplay = dp->parser->max_vdisplay;
 
 	/*
 	 * If dp video session is not restored from a previous session teardown
@@ -1294,7 +1302,6 @@ static int dp_display_usbpd_disconnect_cb(struct device *dev)
 
 	SDE_EVT32_EXTERNAL(SDE_EVTLOG_FUNC_EXIT, dp->state);
 end:
-	SDE_EVT32_EXTERNAL(SDE_EVTLOG_FUNC_EXIT, dp->state);
 	return rc;
 }
 
@@ -2075,7 +2082,6 @@ static int dp_display_post_enable(struct dp_display *dp_display, void *panel)
 	cancel_delayed_work_sync(&dp->hdcp_cb_work);
 	queue_delayed_work(dp->wq, &dp->hdcp_cb_work, HZ);
 
-	DP_INFO("dp audio supported: %d\n", dp_panel->audio_supported);
 	if (dp_panel->audio_supported) {
 		dp_panel->audio->bw_code = dp->link->link_params.bw_code;
 		dp_panel->audio->lane_count = dp->link->link_params.lane_count;
@@ -2318,23 +2324,162 @@ end:
 	return 0;
 }
 
+static int dp_display_validate_resources(
+		struct dp_display *dp_display,
+		void *panel, struct drm_display_mode *mode,
+		const struct msm_resource_caps_info *avail_res)
+{
+	struct dp_display_private *dp;
+	struct dp_panel *dp_panel;
+	struct dp_debug *debug;
+	struct dp_display_mode dp_mode;
+	u32 mode_rate_khz, supported_rate_khz, mode_bpp, num_lm;
+	int rc, tmds_max_clock, rate;
+	bool dsc_en;
+
+	dp = container_of(dp_display, struct dp_display_private, dp_display);
+	dp_panel = panel;
+	debug = dp->debug;
+
+	dp_display->convert_to_dp_mode(dp_display, panel, mode, &dp_mode);
+
+	dsc_en = dp_mode.timing.comp_info.comp_ratio ? true : false;
+	mode_bpp = dsc_en ? dp_mode.timing.comp_info.dsc_info.bpp :
+			dp_mode.timing.bpp;
+
+	mode_rate_khz = mode->clock * mode_bpp;
+	rate = drm_dp_bw_code_to_link_rate(dp->link->link_params.bw_code);
+	supported_rate_khz = dp->link->link_params.lane_count * rate * 8;
+	tmds_max_clock = dp_panel->connector->display_info.max_tmds_clock;
+
+	if (mode_rate_khz > supported_rate_khz) {
+		DP_DEBUG("pclk:%d, supported_rate:%d\n",
+				mode->clock, supported_rate_khz);
+		return -EINVAL;
+	}
+
+	if (mode->clock > dp_display->max_pclk_khz) {
+		DP_DEBUG("clk:%d, max:%d\n", mode->clock,
+				dp_display->max_pclk_khz);
+		return -EINVAL;
+	}
+
+	if ((dp_display->max_hdisplay > 0) && (dp_display->max_vdisplay > 0) &&
+			((mode->hdisplay > dp_display->max_hdisplay) ||
+			(mode->vdisplay > dp_display->max_vdisplay))) {
+		DP_DEBUG("hdisplay:%d, max-hdisplay:%d",
+			mode->hdisplay, dp_display->max_hdisplay);
+		DP_DEBUG("vdisplay:%d, max-vdisplay:%d\n",
+			mode->vdisplay, dp_display->max_vdisplay);
+		return -EINVAL;
+	}
+
+	if (tmds_max_clock > 0 && mode->clock > tmds_max_clock) {
+		DP_DEBUG("clk:%d, max tmds:%d\n", mode->clock,
+				tmds_max_clock);
+		return -EINVAL;
+	}
+
+	rc = msm_get_mixer_count(dp->priv, mode, avail_res, &num_lm);
+	if (rc) {
+		DP_ERR("error getting mixer count. rc:%d\n", rc);
+		return -EINVAL;
+	}
+
+	if (num_lm > avail_res->num_lm ||
+			(num_lm == 2 && !avail_res->num_3dmux)) {
+		DP_DEBUG("num_lm:%d, req lm:%d 3dmux:%d\n", num_lm,
+				avail_res->num_lm, avail_res->num_3dmux);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int dp_display_check_overrides(
+		struct dp_display *dp_display,
+		void *panel, struct drm_display_mode *mode,
+		const struct msm_resource_caps_info *avail_res)
+{
+	struct dp_mst_connector *mst_connector;
+	struct dp_display_private *dp;
+	struct dp_panel *dp_panel;
+	struct dp_debug *debug;
+	bool in_list = false;
+	int hdis, vdis, vref, ar, _hdis, _vdis, _vref, _ar;
+
+	dp = container_of(dp_display, struct dp_display_private, dp_display);
+	dp_panel = panel;
+	debug = dp->debug;
+
+	/*
+	 * If the connector exists in the mst connector list and if debug is
+	 * enabled for that connector, use the mst connector settings from the
+	 * list for validation. Otherwise, use non-mst default settings.
+	 */
+	mutex_lock(&debug->dp_mst_connector_list.lock);
+
+	if (list_empty(&debug->dp_mst_connector_list.list)) {
+		DP_MST_DEBUG("MST connect list is empty\n");
+		mutex_unlock(&debug->dp_mst_connector_list.lock);
+		goto verify_default;
+	}
+
+	list_for_each_entry(mst_connector, &debug->dp_mst_connector_list.list,
+			list) {
+		if (mst_connector->con_id == dp_panel->connector->base.id) {
+			in_list = true;
+
+			if (!mst_connector->debug_en) {
+				mutex_unlock(
+				&debug->dp_mst_connector_list.lock);
+				return 0;
+			}
+
+			hdis = mst_connector->hdisplay;
+			vdis = mst_connector->vdisplay;
+			vref = mst_connector->vrefresh;
+			ar = mst_connector->aspect_ratio;
+
+			_hdis = mode->hdisplay;
+			_vdis = mode->vdisplay;
+			_vref = mode->vrefresh;
+			_ar = mode->picture_aspect_ratio;
+
+			if (hdis == _hdis && vdis == _vdis && vref == _vref &&
+					ar == _ar) {
+				mutex_unlock(
+				&debug->dp_mst_connector_list.lock);
+				return 0;
+			}
+			break;
+		}
+	}
+
+	mutex_unlock(&debug->dp_mst_connector_list.lock);
+	if (in_list)
+		return -EINVAL;
+
+verify_default:
+	if (debug->debug_en && (mode->hdisplay != debug->hdisplay ||
+			mode->vdisplay != debug->vdisplay ||
+			mode->vrefresh != debug->vrefresh ||
+			mode->picture_aspect_ratio != debug->aspect_ratio))
+		return -EINVAL;
+
+	return 0;
+}
+
 static enum drm_mode_status dp_display_validate_mode(
 		struct dp_display *dp_display,
 		void *panel, struct drm_display_mode *mode,
 		const struct msm_resource_caps_info *avail_res)
 {
 	struct dp_display_private *dp;
-	u32 mode_rate_khz = 0, supported_rate_khz = 0, mode_bpp = 0;
+
 	struct dp_panel *dp_panel;
 	struct dp_debug *debug;
 	enum drm_mode_status mode_status = MODE_BAD;
-	bool in_list = false;
-	struct dp_mst_connector *mst_connector;
-	int hdis, vdis, vref, ar, _hdis, _vdis, _vref, _ar, rate;
-	struct dp_display_mode dp_mode;
-	bool dsc_en;
-	u32 num_lm = 0;
-	int rc = 0, tmds_max_clock = 0;
 
 	if (!dp_display || !mode || !panel ||
 			!avail_res || !avail_res->max_mixer_width) {
@@ -2353,109 +2498,26 @@ static enum drm_mode_status dp_display_validate_mode(
 	}
 
 	debug = dp->debug;
-	if (!debug)
-		goto end;
-
-	dp_display->convert_to_dp_mode(dp_display, panel, mode, &dp_mode);
-
-	dsc_en = dp_mode.timing.comp_info.comp_ratio ? true : false;
-	mode_bpp = dsc_en ? dp_mode.timing.comp_info.dsc_info.bpp :
-			dp_mode.timing.bpp;
-
-	mode_rate_khz = mode->clock * mode_bpp;
-	rate = drm_dp_bw_code_to_link_rate(dp->link->link_params.bw_code);
-	supported_rate_khz = dp->link->link_params.lane_count * rate * 8;
-	tmds_max_clock = dp_panel->connector->display_info.max_tmds_clock;
-
-	if (mode_rate_khz > supported_rate_khz) {
-		DP_MST_DEBUG("pclk:%d, supported_rate:%d\n",
-				mode->clock, supported_rate_khz);
+	if (!debug) {
+		DP_ERR("invalid debug node\n");
 		goto end;
 	}
 
-	if (mode->clock > dp_display->max_pclk_khz) {
-		DP_MST_DEBUG("clk:%d, max:%d\n", mode->clock,
-				dp_display->max_pclk_khz);
+	if (dp_display_validate_resources(dp_display, panel, mode, avail_res)) {
+		DP_DEBUG("DP bad mode %dx%d@%d\n",
+			mode->hdisplay, mode->vdisplay, mode->clock);
 		goto end;
 	}
 
-	if (tmds_max_clock > 0 && mode->clock > tmds_max_clock) {
-		DP_MST_DEBUG("clk:%d, max tmds:%d\n", mode->clock,
-				tmds_max_clock);
+	if (dp_display_check_overrides(dp_display, panel,
+				mode, avail_res)) {
+		DP_MST_DEBUG("DP overrides ignore mode %dx%d@%d\n",
+			mode->hdisplay, mode->vdisplay, mode->clock);
 		goto end;
 	}
 
-	rc = msm_get_mixer_count(dp->priv, mode, avail_res, &num_lm);
-	if (rc) {
-		DP_ERR("error getting mixer count. rc:%d\n", rc);
-		goto end;
-	}
-
-	if (num_lm > avail_res->num_lm ||
-			(num_lm == 2 && !avail_res->num_3dmux)) {
-		DP_MST_DEBUG("num_lm:%d, req lm:%d 3dmux:%d\n", num_lm,
-				avail_res->num_lm, avail_res->num_3dmux);
-		goto end;
-	}
-
-	/*
-	 * If the connector exists in the mst connector list and if debug is
-	 * enabled for that connector, use the mst connector settings from the
-	 * list for validation. Otherwise, use non-mst default settings.
-	 */
-	mutex_lock(&debug->dp_mst_connector_list.lock);
-
-	if (list_empty(&debug->dp_mst_connector_list.list)) {
-		mutex_unlock(&debug->dp_mst_connector_list.lock);
-		goto verify_default;
-	}
-
-	list_for_each_entry(mst_connector, &debug->dp_mst_connector_list.list,
-			list) {
-		if (mst_connector->con_id == dp_panel->connector->base.id) {
-			in_list = true;
-
-			if (!mst_connector->debug_en) {
-				mode_status = MODE_OK;
-				mutex_unlock(
-				&debug->dp_mst_connector_list.lock);
-				goto end;
-			}
-
-			hdis = mst_connector->hdisplay;
-			vdis = mst_connector->vdisplay;
-			vref = mst_connector->vrefresh;
-			ar = mst_connector->aspect_ratio;
-
-			_hdis = mode->hdisplay;
-			_vdis = mode->vdisplay;
-			_vref = mode->vrefresh;
-			_ar = mode->picture_aspect_ratio;
-
-			if (hdis == _hdis && vdis == _vdis && vref == _vref &&
-					ar == _ar) {
-				mode_status = MODE_OK;
-				mutex_unlock(
-				&debug->dp_mst_connector_list.lock);
-				goto end;
-			}
-
-			break;
-		}
-	}
-
-	mutex_unlock(&debug->dp_mst_connector_list.lock);
-
-	if (in_list)
-		goto end;
-
-verify_default:
-	if (debug->debug_en && (mode->hdisplay != debug->hdisplay ||
-			mode->vdisplay != debug->vdisplay ||
-			mode->vrefresh != debug->vrefresh ||
-			mode->picture_aspect_ratio != debug->aspect_ratio))
-		goto end;
-
+	DP_DEBUG("DP ok mode %dx%d@%d\n",
+			mode->hdisplay, mode->vdisplay, mode->clock);
 	mode_status = MODE_OK;
 end:
 	mutex_unlock(&dp->session_lock);
@@ -2655,6 +2717,11 @@ static int dp_display_init_aux_switch(struct dp_display_private *dp)
 	if (!dp->aux_switch_node) {
 		DP_WARN("cannot parse %s handle\n", phandle);
 		rc = -ENODEV;
+		goto end;
+	}
+
+	if (strcmp(dp->aux_switch_node->name, "fsa4480")) {
+		DP_DEBUG("Not an fsa4480 aux switch\n");
 		goto end;
 	}
 
