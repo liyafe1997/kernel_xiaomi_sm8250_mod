@@ -155,7 +155,6 @@ int ovl_getattr(const struct path *path, struct kstat *stat,
 	bool metacopy_blocks = false;
 
 	metacopy_blocks = ovl_is_metacopy_dentry(dentry);
-
 	type = ovl_path_real(dentry, &realpath);
 	old_cred = ovl_override_creds(dentry->d_sb);
 	err = vfs_getattr(&realpath, stat, request_mask, flags);

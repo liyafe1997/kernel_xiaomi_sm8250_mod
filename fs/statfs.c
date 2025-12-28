@@ -9,6 +9,10 @@
 #include <linux/security.h>
 #include <linux/uaccess.h>
 #include <linux/compat.h>
+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+#include <linux/susfs_def.h>
+#include "mount.h"
+#endif
 #include "internal.h"
 
 static int flags_by_mnt(int mnt_flags)
@@ -70,11 +74,23 @@ static int statfs_by_dentry(struct dentry *dentry, struct kstatfs *buf)
 int vfs_statfs(const struct path *path, struct kstatfs *buf)
 {
 	int error;
+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+	struct mount *mnt;
 
+	mnt = real_mount(path->mnt);
+	if (likely(susfs_is_current_proc_umounted())) {
+		for (; mnt->mnt_id >= DEFAULT_KSU_MNT_ID; mnt = mnt->mnt_parent) {}
+	}
+	error = statfs_by_dentry(mnt->mnt.mnt_root, buf);
+	if (!error)
+		buf->f_flags = calculate_f_flags(&mnt->mnt);
+	return error;
+#else
 	error = statfs_by_dentry(path->dentry, buf);
 	if (!error)
 		buf->f_flags = calculate_f_flags(path->mnt);
 	return error;
+#endif
 }
 EXPORT_SYMBOL(vfs_statfs);
 
