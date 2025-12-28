@@ -450,16 +450,8 @@ out:
 	return res;
 }
 
-#ifdef CONFIG_KSU
-extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode,
-			                    int *flags);
-#endif
-
 SYSCALL_DEFINE3(faccessat, int, dfd, const char __user *, filename, int, mode)
 {
-#ifdef CONFIG_KSU
-	ksu_handle_faccessat(&dfd, &filename, &mode, NULL);
-#endif
 	return do_faccessat(dfd, filename, mode);
 }
 
