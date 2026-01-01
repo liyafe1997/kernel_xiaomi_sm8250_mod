@@ -159,7 +159,7 @@ mkdir -p anykernel/kernels/
 # Patch for SukiSU KPM support. 
 if [ $KSU_ENABLE -eq 1 ]; then
     cd out/arch/arm64/boot/
-    wget https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.12.5/patch_linux
+    wget https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.12.2/patch_linux
     chmod +x patch_linux
     ./patch_linux
     rm Image
@@ -328,7 +328,7 @@ mkdir -p anykernel/kernels/
 # Patch for SukiSU KPM support. 
 if [ $KSU_ENABLE -eq 1 ]; then
     cd out/arch/arm64/boot/
-    wget https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.12.5/patch_linux
+    wget https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.12.2/patch_linux
     chmod +x patch_linux
     ./patch_linux
     rm Image
