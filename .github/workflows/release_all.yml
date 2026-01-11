@@ -1,0 +1,103 @@
+name: Build and Release All Kernels
+
+on:
+  workflow_dispatch: # 手动触发
+
+permissions:
+  contents: write # 赋予创建 Release 的权限
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 对应 README 中的支持设备列表
+        device: [psyche, thyme, umi, munch, lmi, cmi, cas, apollo, alioth, elish, enuma, dagu, pipa]
+        ksu_enabled: [true, false]
+
+    name: Build ${{ matrix.device }} (${{ matrix.ksu_enabled && 'KSU' || 'NoKSU' }})
+
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install Dependencies
+        # 安装构建环境所需依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git curl wget bison flex zip bc cpio libssl-dev ccache python-is-python3
+          sudo apt-get install -y gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi
+
+      - name: Setup Toolchain (ZyC-Clang 15)
+        # 下载并配置 build.sh 指定的工具链路径
+        run: |
+          mkdir -p $HOME/zyc-clang
+          cd $HOME/zyc-clang
+          wget -q https://github.com/ZyCromerZ/Clang/releases/download/15.0.7-20251111-release/Clang-15.0.7-20251111.tar.gz
+          tar -zxvf Clang-15.0.7-20251111.tar.gz
+
+      - name: Run Build Script
+        # 调用脚本，自动生成 AOSP 和 MIUI 两个版本的 Zip
+        run: |
+          chmod +x build.sh
+          if [ "${{ matrix.ksu_enabled }}" = "true" ]; then
+            bash build.sh ${{ matrix.device }} ksu
+          else
+            bash build.sh ${{ matrix.device }}
+          fi
+
+      - name: Upload Local Artifacts
+        # 将生成的 Zip 暂时存储到 GitHub 暂存区
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-artifacts-${{ matrix.device }}-${{ matrix.ksu_enabled }}
+          path: ./*.zip
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+
+      - name: Download All Artifacts
+        # 下载之前所有矩阵任务生成的 Zip 文件
+        uses: actions/download-artifact@v4
+        with:
+          path: all_kernels
+          pattern: kernel-artifacts-*
+          merge-multiple: true
+
+      - name: Prepare Release Info
+        # 获取构建日期和 SHA1
+        id: info
+        run: |
+          echo "BUILD_DATE=$(date +'%Y%m%d')" >> $GITHUB_ENV
+          echo "GIT_SHA=$(git rev-parse --short=8 HEAD)" >> $GITHUB_ENV
+          echo "TAG_NAME=v$(date +'%Y%m%d')-$(git rev-parse --short=8 HEAD)" >> $GITHUB_ENV
+
+      - name: Create GitHub Release
+        # 使用 softprops/action-gh-release 自动发布
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          name: "ApartTUSITU Kernel Build - ${{ env.BUILD_DATE }} (${{ env.GIT_SHA }})"
+          body: |
+            ## 自动构建内核发布 / Automated Kernel Release
+            
+            - **构建日期 / Build Date:** ${{ env.BUILD_DATE }}
+            - **提交哈希 / Commit SHA:** `${{ env.GIT_SHA }}`
+            - **包含设备 / Devices:** psyche, thyme, umi, munch, lmi, cmi, cas, apollo, alioth, elish, enuma, dagu, pipa
+            
+            ---
+            **分类指南 / Instruction:**
+            - **MIUI**: 适用于小米官方或基于小米官方修改的 ROM。
+            - **AOSP**: 适用于类原生 ROM (LineageOS, Pixel Experience 等)。
+            - **SukiSU-SUSFS**: 已集成 ReSukiSU 和 SuSFS 补丁。
+          files: all_kernels/*.zip
+          draft: false
+          prerelease: false
+

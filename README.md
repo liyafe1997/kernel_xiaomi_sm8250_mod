@@ -1,8 +1,3 @@
-# Notice / 注意
-For SukiSU users: Please use [SukiSU Manager 3.2.0](https://github.com/SukiSU-Ultra/SukiSU-Ultra/releases/tag/v3.2.0), 4.0 and above are not supported yet of the SukiSU version in this kernel.
-
-SukiSU用户请使用 [SukiSU 管理器 3.2.0 版本](https://github.com/SukiSU-Ultra/SukiSU-Ultra/releases/tag/v3.2.0)，4.0及以上版本不支持该内核中的SukiSU版本。
-
 # About this repo
 
 [中文](#中文)
