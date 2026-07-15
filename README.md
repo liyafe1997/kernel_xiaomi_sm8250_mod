@@ -1,8 +1,3 @@
-# Notice / 注意
-For SukiSU users: Please use [SukiSU Manager 3.2.0](https://github.com/SukiSU-Ultra/SukiSU-Ultra/releases/tag/v3.2.0), 4.0 and above are not supported yet of the SukiSU version in this kernel.
-
-SukiSU用户请使用 [SukiSU 管理器 3.2.0 版本](https://github.com/SukiSU-Ultra/SukiSU-Ultra/releases/tag/v3.2.0)，4.0及以上版本不支持该内核中的SukiSU版本。
-
 # About this repo
 
 [中文](#中文)
@@ -14,9 +9,9 @@ Originally this repo (`android12-stable-mod` or `android14-stable-mod` branch) i
 
 So still Thanks to [@UtsavBalar1231](https://github.com/UtsavBalar1231/)!
 
-The main purpose of maintaining and building this kernel is to fix [this battery stuck at 1% problem](https://github.com/liyafe1997/Xiaomi-fix-battery-one-percent), and provide [SukiSU](https://github.com/ShirkNeko/SukiSU-Ultra)(A KernelSU fork with KPM support) & [SUSFS](https://github.com/sidex15/susfs4ksu-module) integrated pre-built image(flashable anykernel3 zip). Also provides a more intuitive and easy-to-use build script and build guide that allow you to try to build by yourself.
+The main purpose of maintaining and building this kernel is to fix [this battery stuck at 1% problem](https://github.com/liyafe1997/Xiaomi-fix-battery-one-percent), and provide [ReSukiSU](https://github.com/ReSukiSU/ReSukiSU)(A SukiSU fork) & SuSFS integrated pre-built image(flashable anykernel3 zip). Also provides a more intuitive and easy-to-use build script and build guide that allow you to try to build by yourself.
 
-For using the SukiSU, you can install the SukiSU manager APK from [SukiSU Github Release](https://github.com/ShirkNeko/SukiSU-Ultra/releases). For the SUSFS module see [susfs4ksu-module Gihub Release](https://github.com/sidex15/susfs4ksu-module/releases).
+For using the ReSukiSU and SuSFS, you can install the ReSukiSU manager APK from [ReSukiSU Github Actions](https://github.com/ReSukiSU/ReSukiSU/actions).
 
 (The devices affected by the "1% battery bug" are: alioth, apollo, lmi, thyme, umi, pipa. Because they all use the PM8150, aka Qualcomm fuel gauge GEN4. For the other devices are not affected by that bug, you can use this kernel for KernelSU purpose, as a replacement of the orginal stock kernel. Also, as the people tested, this kernel NoKernelSU version is good for applying [APatch](https://github.com/bmax121/APatch)).
 
@@ -57,7 +52,7 @@ Other Features/Improvement of this Kernel:
 
 所以仍然感谢 [@UtsavBalar1231](https://github.com/UtsavBalar1231/)！
 
-维护和编译这个内核的主要目的是想修复[电量卡在1%的问题](https://github.com/liyafe1997/Xiaomi-fix-battery-one-percent)，以及提供带[SukiSU](https://github.com/ShirkNeko/SukiSU-Ultra)(一个KernelSU的fork，支持KPM) & [SUSFS](https://github.com/sidex15/susfs4ksu-module)的预编译好的内核（请自行安装[SukiSU的管理器](https://github.com/ShirkNeko/SukiSU-Ultra/releases)以及根据需要刷上SUSFS模块）。以及再提供一个更直观和易用的编译脚本和README，方便大家自己折腾和修改，编译自己的内核！
+维护和编译这个内核的主要目的是想修复[电量卡在1%的问题](https://github.com/liyafe1997/Xiaomi-fix-battery-one-percent)，以及提供带[ReSukiSU](https://github.com/ReSukiSU/ReSukiSU)(一个SukiSU的fork) & SuSFS的预编译好的内核（请自行安装[ReSukiSU的管理器](https://github.com/ReSukiSU/ReSukiSU/actions)）。以及再提供一个更直观和易用的编译脚本和README，方便大家自己折腾和修改，编译自己的内核！
 
 （其中受“1%电量bug”影响的设备有：alioth, apollo, lmi, thyme, umi, pipa，因为它们都用了PM8150即高通的GEN4电量计。其它不受此bug影响的设备大可把这个内核当成个带SukiSU & SUSFS的官核平替，如果你想找一个带KernelSU的内核的话。并且据大家测试，该内核不带KernelSU版本可以应用[APatch](https://github.com/bmax121/APatch)）
 

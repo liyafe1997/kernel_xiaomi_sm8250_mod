@@ -94,6 +94,9 @@ static void inotify_fdinfo(struct seq_file *m, struct fsnotify_mark *mark)
 {
 	struct inotify_inode_mark *inode_mark;
 	struct inode *inode;
+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+	struct mount *mnt = NULL;
+#endif
 
 	if (mark->connector->type != FSNOTIFY_OBJ_TYPE_INODE)
 		return;
@@ -102,35 +105,42 @@ static void inotify_fdinfo(struct seq_file *m, struct fsnotify_mark *mark)
 	inode = igrab(fsnotify_conn_inode(mark->connector));
 	if (inode) {
 #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-		if (likely(current->susfs_task_state & TASK_STRUCT_NON_ROOT_USER_APP_PROC) &&
-				unlikely(inode->i_state & INODE_STATE_SUS_KSTAT)) {
+		mnt = real_mount(file->f_path.mnt);
+		if (mnt->mnt_id >= DEFAULT_KSU_MNT_ID &&
+			likely(susfs_is_current_proc_umounted()))
+		{
 			struct path path;
 			char *pathname = kmalloc(PAGE_SIZE, GFP_KERNEL);
 			char *dpath;
 			if (!pathname) {
-				goto out_seq_printf;
+				goto orig_flow;
 			}
 			dpath = d_path(&file->f_path, pathname, PAGE_SIZE);
 			if (!dpath) {
-				goto out_free_pathname;
+				goto out_kfree;
 			}
 			if (kern_path(dpath, 0, &path)) {
-				goto out_free_pathname;
+				goto out_kfree;
+			}
+			if (!path.dentry->d_inode) {
+				goto out_path_put;
 			}
 			seq_printf(m, "inotify wd:%x ino:%lx sdev:%x mask:%x ignored_mask:0 ",
-			   inode_mark->wd, path.dentry->d_inode->i_ino, path.dentry->d_inode->i_sb->s_dev,
-			   inotify_mark_user_mask(mark));
+					inode_mark->wd, path.dentry->d_inode->i_ino, path.dentry->d_inode->i_sb->s_dev,
+					inotify_mark_user_mask(mark));
 			show_mark_fhandle(m, path.dentry->d_inode);
 			seq_putc(m, '\n');
-			iput(inode);
 			path_put(&path);
 			kfree(pathname);
+			iput(inode);
 			return;
-out_free_pathname:
+out_path_put:
+			path_put(&path);
+out_kfree:
 			kfree(pathname);
 		}
-out_seq_printf:
-#endif
+orig_flow:
+#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 		seq_printf(m, "inotify wd:%x ino:%lx sdev:%x mask:%x ignored_mask:0 ",
 			   inode_mark->wd, inode->i_ino, inode->i_sb->s_dev,
 			   inotify_mark_user_mask(mark));
