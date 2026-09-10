@@ -449,6 +449,10 @@ static int __maybe_unused xhci_plat_suspend(struct device *dev)
 
 	dev_dbg(dev, "xhci-plat PM suspend\n");
 
+	/* Runtime suspend may already have stopped the parent controller clocks. */
+	if (pm_runtime_suspended(dev))
+		return 0;
+
 	/* Disable wakeup capability */
 	return xhci_suspend(xhci, false);
 }
@@ -469,6 +473,11 @@ static int __maybe_unused xhci_plat_resume(struct device *dev)
 	}
 
 	dev_dbg(dev, "xhci-plat PM resume\n");
+
+	/* An aborted system suspend may have left the parent runtime suspended. */
+	ret = pm_runtime_resume(dev);
+	if (ret <= 0)
+		return ret;
 
 	ret = xhci_priv_resume_quirk(hcd);
 	if (ret)
